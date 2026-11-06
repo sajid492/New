@@ -275,7 +275,7 @@ const DEFAULTS = {
   since:"2026-10-26", theme:"earth", mode:"system",
   cards:{csat:true,voc:true,cs_quality:true,risk_quality:true,o2c:true},
   sources:{slack:true,linear:true,gmail:true,rp:true,bamboo:true},
-  slackMentions:true, slackDMs:true, gmailImportant:false, linearDone:false, showDone:false,
+  slackMentions:true, slackDMs:true, actionOnly:true, aiTriage:true, gmailImportant:false, linearDone:false, showDone:false,
   refreshMin:30, reminderTime:"09:30",
   template:"Hi {name}, gentle reminder on \"{title}\". Could you share an update{due}? Thanks!",
   slackUserId:"", myEmail:""
@@ -287,9 +287,9 @@ const S = {
   settings: structuredClone(DEFAULTS), kpis:{}, kpisLoaded:false,
   items:{slack:[],linear:[],gmail:[],rp:[]}, status:{}, err:{}, at:{},
   dir:"in", q:"", sel:new Set(), open:{}, ui:{done:{},reminded:{}},
-  tasks:null, me:{}, cap:{}, uid:null
+  tasks:null, me:{}, cap:{}, uid:null, triage:{}, triaging:{}, showAll:{}
 };
-let stateRef=null, settingsRef=null, tasksCol=null;
+let stateRef=null, settingsRef=null, tasksCol=null, triageRef=null;
 
 /* ---------------- helpers ---------------- */
 const use=n=>{try{return window.claude&&window.claude.use?window.claude.use(n).catch(()=>null):Promise.resolve(null)}catch{return Promise.resolve(null)}};
@@ -408,29 +408,46 @@ async function slackSearch(input,pages,fresh){
   }
   return rows;
 }
+const ACK_ONLY=/^(ok(ay)?|okk+|done|thanks?( you)?( so much)?|thank you|ty|noted|sure|great|cool|got it|ack|yes|yep|no|perfect|nice|awesome|will do|on it|\+1)[\s.!:)\w]{0,3}$/i;
+const ASK_RE=/\?|\b(please|pls|plz|kindly|can you|could you|can u|would you|will you|need (you|your|to)|needs? your|required|review|approve|approval|sign[- ]?off|confirm|check|share|send|update|let me know|lmk|asap|urgent|eod|by (today|tomorrow|mon|tue|wed|thu|fri|eod)|deadline|action|follow[- ]?up|help|look into|take care|reply|respond|feedback|thoughts|input)\b/i;
+const looksAsk=t=>{t=(t||"").trim();return !!t&&!ACK_ONLY.test(t)&&ASK_RE.test(t)};
+const isDMrow=r=>r.channel==="DM"||/^group dm/i.test(r.channel)||/^D/.test(r.channelId);
 async function fetchSlack(fresh){
   const me=S.settings.slackUserId; if(!me) throw {code:"setup",message:"Add your Slack member ID under Admin → Connectors so Fiza can find your mentions."};
   const after="after:"+addDays(S.settings.since,-1);
   const jobs=[];
   if(S.settings.slackMentions) jobs.push(slackSearch({keywords:[`<@${me}>`],filters:after,natural_language_query:""},3,fresh));
-  if(S.settings.slackDMs) jobs.push(slackSearch({filters:"is:dm "+after,natural_language_query:""},2,fresh));
-  jobs.push(slackSearch({filters:`from:<@${me}> ${after}`,natural_language_query:"asking someone to do a task, follow up or share an update"},3,fresh));
-  const res=await Promise.all(jobs); const outRows=res.pop(); const inRows=res.flat();
+  if(S.settings.slackDMs) jobs.push(slackSearch({filters:"is:dm "+after,natural_language_query:""},3,fresh));
+  jobs.push(slackSearch({filters:`from:<@${me}> ${after}`,natural_language_query:""},5,fresh));
+  const res=await Promise.all(jobs); const mine=res.pop(); const inRows=res.flat().filter(r=>r.fromId!==me);
+  const myBy={}; for(const m of mine)(myBy[m.channelId]=myBy[m.channelId]||[]).push(m);
+  const iReplied=r=>(myBy[r.channelId]||[]).some(m=>m.time>r.time&&(isDMrow(r)||m.threadTs===r.threadTs));
   const seen=new Set(), items=[];
   for(const r of inRows){
-    if(r.fromId===me) continue; const k=r.channelId+r.ts; if(seen.has(k))continue; seen.add(k);
-    const txt=cleanSlack(r.raw);
-    items.push({src:"slack",dir:"in",id:k,title:txt.split("\n")[0].slice(0,140)||"(message)",body:txt,person:r.fromName,where:r.channel==="DM"?"Direct message":r.channel,time:r.time,url:r.perm,channelId:r.channelId,ts:r.ts,threadTs:r.threadTs,replies:r.replies});
+    const k=r.channelId+r.ts; if(seen.has(k))continue; seen.add(k);
+    const txt=cleanSlack(r.raw), dm=isDMrow(r), mentionsMe=r.raw.includes(`<@${me}`);
+    const broadcast=/<!(here|channel|everyone)>/.test(r.raw)&&!mentionsMe;
+    const replied=iReplied(r);
+    const it={src:"slack",dir:"in",id:k,title:txt.split("\n")[0].slice(0,140)||"(message)",body:txt,person:r.fromName,where:dm?"Direct message":r.channel,time:r.time,url:r.perm,channelId:r.channelId,ts:r.ts,threadTs:r.threadTs,replies:r.replies};
+    if(replied){it.hard="You replied";}
+    else if(broadcast){it.hard="Announcement";}
+    else if(ACK_ONLY.test(txt.trim())){it.hard="Acknowledgement";}
+    it.heur=!it.hard&&looksAsk(txt);
+    items.push(it);
   }
-  for(const r of outRows){
+  for(const r of mine){
     const others=[...r.raw.matchAll(/<@(U\w+)(?:\|([^>]+))?>/g)].filter(m=>m[1]!==me);
-    const isDM=r.channel==="DM";
-    if(!others.length&&!isDM) continue;
+    const dm=isDMrow(r);
+    if(!others.length&&!dm) continue;
     const k=r.channelId+r.ts; if(seen.has(k))continue; seen.add(k);
     let who=others.map(m=>m[2]||m[1]).filter((v,i,a)=>a.indexOf(v)===i).join(", ");
-    if(!who&&isDM) who=(r.participants||"").split(",").map(s=>s.replace(/\(ID:.*?\)/,"").trim()).filter(n=>n&&n!==r.fromName).join(", ")||"DM";
+    if(!who&&dm) who=(r.participants||"").split(",").map(s=>s.replace(/\(ID:.*?\)/,"").trim()).filter(n=>n&&n!==r.fromName).join(", ")||"DM";
     const txt=cleanSlack(r.raw);
-    items.push({src:"slack",dir:"out",id:k,title:txt.split("\n")[0].slice(0,140)||"(message)",body:txt,person:who,firstName:(who.split(/[ ,]/)[0]||"there"),where:isDM?"Direct message":r.channel,time:r.time,url:r.perm,channelId:r.channelId,ts:r.ts,threadTs:r.threadTs,replies:r.replies});
+    const answered=dm?inRows.some(x=>x.channelId===r.channelId&&x.time>r.time):((r.threadTs===r.ts&&r.replies>0)||inRows.some(x=>x.channelId===r.channelId&&x.threadTs===r.threadTs&&x.time>r.time)||(myBy[r.channelId]||[]).some(m=>m.threadTs===r.threadTs&&m.time>r.time));
+    const it={src:"slack",dir:"out",id:k,title:txt.split("\n")[0].slice(0,140)||"(message)",body:txt,person:who,firstName:(who.split(/[ ,]/)[0]||"there"),where:dm?"Direct message":r.channel,time:r.time,url:r.perm,channelId:r.channelId,ts:r.ts,threadTs:r.threadTs,replies:r.replies};
+    if(answered) it.hard="They replied"; else if(ACK_ONLY.test(txt.trim())) it.hard="Acknowledgement";
+    it.heur=!it.hard&&looksAsk(txt);
+    items.push(it);
   }
   return items.sort((a,b)=>b.time-a.time);
 }
@@ -448,19 +465,33 @@ async function fetchLinear(fresh){
   for(const i of (mineMade.issues||[])){if(!i.assignee||i.assignee===S.me.linearName)continue;if(!S.settings.linearDone&&closed(i.statusType))continue;items.push(mk(i,"out"))}
   return items.sort((a,b)=>(b.overdue-a.overdue)||(a.due||"9").localeCompare(b.due||"9")||b.time-a.time);
 }
+const AUTO_FROM=/(no-?reply|do-?not-?reply|notifications?@|notify@|mailer|calendar|alerts?@|digest|newsletter|news@|updates?@|bounce|@(.*\.)?(slack|linear|intercom|atlassian|google|granola|hubspot|notion|zoom|docusign|github|gitlab|loom|calendly|revolutpeople|bamboohr)\.(com|so|ai|app|io|us|net))/i;
+const AUTO_SUBJ=/^(invitation|updated invitation|accepted|declined|tentative|canceled event|cancelled event|new event|📝|reminder:|\[.*\] (new|updated)|.* shared .* with you|your .* (receipt|invoice|statement))/i;
 async function fetchGmail(fresh){
   const d=S.settings.since.replace(/-/g,"/");
   const my=(S.settings.myEmail||"").toLowerCase();
-  const qIn=`in:inbox after:${d} -category:promotions -category:social -category:forums`+(my?` -from:${my}`:"")+(S.settings.gmailImportant?" is:important":"");
-  const [a,b]=await Promise.all([call("Gmail","search_threads",{query:qIn,pageSize:40,view:"THREAD_VIEW_SUMMARY"},{fresh}),call("Gmail","search_threads",{query:`in:sent after:${d}`,pageSize:40,view:"THREAD_VIEW_SUMMARY"},{fresh})]);
+  const qIn=`in:inbox after:${d} -category:promotions -category:social -category:forums -category:updates`+(my?` -from:${my}`:"")+(S.settings.gmailImportant?" is:important":"");
+  const [a,b]=await Promise.all([call("Gmail","search_threads",{query:qIn,pageSize:50,view:"THREAD_VIEW_SUMMARY"},{fresh}),call("Gmail","search_threads",{query:`in:sent after:${d}`,pageSize:50,view:"THREAD_VIEW_SUMMARY"},{fresh})]);
   const nameOf=(m,addr)=>{const x=(m.addressDisplayNames||[]).find(z=>(z.emailAddress||"").toLowerCase()===(addr||"").toLowerCase());return (x&&x.displayName)||addr||""};
+  const lc=a=>(a||[]).map(x=>String(x).toLowerCase());
   const items=[],seen=new Set();
-  for(const t of (a.threads||[])){const m=(t.messages||[])[0];if(!m)continue;if(my&&(m.sender||"").toLowerCase()===my)continue;seen.add(t.id);
-    items.push({src:"gmail",dir:"in",id:t.id,title:m.subject||"(no subject)",body:m.snippet||"",person:nameOf(m,m.sender),where:(m.labelIds||[]).includes("UNREAD")?"Unread":"Inbox",unread:(m.labelIds||[]).includes("UNREAD"),time:Date.parse(m.date)||0,url:t.viewUrl||m.viewUrl,messageId:m.id,count:t.messageCount})}
+  for(const t of (a.threads||[])){const m=(t.messages||[])[0];if(!m)continue;seen.add(t.id);
+    const sender=(m.sender||"").toLowerCase();
+    if(my&&sender===my)continue; /* you sent the last message: nothing waiting on you */
+    const direct=!my||lc(m.toRecipients).includes(my);
+    const subj=m.subject||"(no subject)", snip=m.snippet||"";
+    const it={src:"gmail",dir:"in",id:t.id,title:subj,body:snip,person:nameOf(m,m.sender),where:direct?"To you":"You're in CC",unread:(m.labelIds||[]).includes("UNREAD"),time:Date.parse(m.date)||0,url:t.viewUrl||m.viewUrl,messageId:m.id,count:t.messageCount,direct};
+    if(AUTO_FROM.test(sender)||AUTO_SUBJ.test(subj)) it.hard="Automated";
+    else if(!direct&&!/sajid/i.test(snip)) it.hard="CC only";
+    it.heur=!it.hard&&(looksAsk(subj+" "+snip)||(direct&&(m.labelIds||[]).includes("IMPORTANT")&&/\?/.test(snip)));
+    items.push(it)}
   for(const t of (b.threads||[])){const m=(t.messages||[])[0];if(!m||seen.has(t.id))continue;
     const fromMe=my?(m.sender||"").toLowerCase()===my:true; if(!fromMe)continue;
+    if(AUTO_SUBJ.test(m.subject||"")) continue;
     const to=(m.toRecipients||[])[0]||""; const nm=nameOf(m,to);
-    items.push({src:"gmail",dir:"out",id:t.id,title:m.subject||"(no subject)",body:m.snippet||"",person:nm+((m.toRecipients||[]).length>1?` +${m.toRecipients.length-1}`:""),firstName:(nm.split(/[ @]/)[0]||"there"),where:"Awaiting reply",time:Date.parse(m.date)||0,url:t.viewUrl||m.viewUrl,messageId:m.id,count:t.messageCount})}
+    const it={src:"gmail",dir:"out",id:t.id,title:m.subject||"(no subject)",body:m.snippet||"",person:nm+((m.toRecipients||[]).length>1?` +${m.toRecipients.length-1}`:""),firstName:(nm.split(/[ @]/)[0]||"there"),where:"Awaiting reply",time:Date.parse(m.date)||0,url:t.viewUrl||m.viewUrl,messageId:m.id,count:t.messageCount};
+    it.heur=looksAsk((m.subject||"")+" "+(m.snippet||""));
+    items.push(it)}
   return items.sort((x,y)=>y.time-x.time);
 }
 async function fetchRP(fresh){
@@ -502,7 +533,7 @@ const FETCH={slack:fetchSlack,linear:fetchLinear,gmail:fetchGmail,rp:fetchRP};
 async function load(src,fresh=false){
   if(!S.settings.sources[src]){S.items[src]=[];S.status[src]="off";renderInbox();return}
   S.status[src]="loading";S.err[src]=null;renderInbox();
-  try{S.items[src]=await FETCH[src](fresh);S.status[src]="ok";S.at[src]=Date.now()}
+  try{S.items[src]=await FETCH[src](fresh);S.status[src]="ok";S.at[src]=Date.now();triage(src)}
   catch(e){S.status[src]="error";S.err[src]=e;if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy"].includes(e&&e.code))S.items[src]=[]}
   renderInbox();renderGlance();updateSync();
 }
@@ -510,6 +541,41 @@ function loadAll(fresh=false){return Promise.all(["slack","linear","gmail","rp"]
 function updateSync(){
   const t=Object.values(S.at).filter(Boolean); const busy=Object.values(S.status).includes("loading");
   $("#syncLbl").textContent=busy?"Syncing…":t.length?"Synced "+ago(Math.max(...t)):(S.cap.mcp?"Ready":"Live data needs claude.ai");
+}
+
+/* ---------------- action triage ---------------- */
+function need(it){
+  if(it.src!=="slack"&&it.src!=="gmail") return true;
+  if(it.hard) return false;
+  const t=S.triage[keyOf(it)];
+  if(t&&S.settings.aiTriage&&S.cap.sample) return !!t.a;
+  return !!it.heur;
+}
+function askOf(it){const t=S.triage[keyOf(it)];return t&&t.a&&t.w?t.w:""}
+function whyHidden(it){if(it.hard)return it.hard;const t=S.triage[keyOf(it)];return t&&!t.a?(t.w||"No action needed"):"No ask detected"}
+const saveTriage=debounce(async()=>{if(!triageRef)return;const ks=Object.keys(S.triage);const keep={};ks.slice(-700).forEach(k=>keep[k]=S.triage[k]);try{await triageRef.set({m:keep})}catch(e){}},1500);
+async function triage(src){
+  if(!S.settings.aiTriage||!S.cap.sample||S.triaging[src]) return;
+  const todo=(S.items[src]||[]).filter(i=>!i.hard&&!S.triage[keyOf(i)]).slice(0,80);
+  if(!todo.length) return;
+  S.triaging[src]=true; renderInbox();
+  try{
+    for(let b=0;b<todo.length;b+=40){
+      const batch=todo.slice(b,b+40);
+      const payload=batch.map((i,n)=>({id:n,dir:i.dir,source:i.src,person:i.person,where:i.where,text:((i.src==="gmail"?i.title+" — ":"")+(i.body||i.title)).slice(0,600)}));
+      const prompt=`You triage work messages for Sajid Magadi (Senior Manager, Quality & Training, Operations at Transak; Slack handle Sajid). Decide for each item whether it needs an action now.
+dir "in" = someone wrote to Sajid. action=true only if it asks Sajid himself to do, answer, review, approve, decide, share, fix or attend something. action=false for FYI, status updates, announcements, thanks/acks, automated notifications, newsletters, calendar invites, and messages addressed to other people.
+dir "out" = Sajid wrote to someone. action=true only if Sajid asked them to do, send or answer something (so he is waiting on them). action=false for his own FYIs, answers, thanks or acks.
+Return ONLY a JSON array with one object per item: {"id":<id>,"action":true|false,"ask":"<max 9 words: what is needed, or why not>"}.
+Items:
+${JSON.stringify(payload)}`;
+      const out=await S.cap.sample.json(prompt,{modelTier:"quick",cache:false});
+      for(const o of (Array.isArray(out)?out:[])){const it=batch[o.id];if(it)S.triage[keyOf(it)]={a:o.action?1:0,w:String(o.ask||"").slice(0,90)}}
+      renderInbox();renderGlance();
+    }
+    saveTriage();
+  }catch(e){ if(e&&e.code==="not_granted"){S.settings.aiTriage=false} }
+  S.triaging[src]=false; renderInbox(); renderGlance();
 }
 
 /* ---------------- actions ---------------- */
@@ -570,7 +636,7 @@ function renderArtifacts(){
   }
 }
 function counts(){
-  const all=Object.values(S.items).flat().filter(i=>!S.ui.done[keyOf(i)]);
+  const all=Object.values(S.items).flat().filter(i=>!S.ui.done[keyOf(i)]&&(!S.settings.actionOnly||need(i)));
   const open=(S.tasks||[]).filter(t=>!t.done);
   return {inn:all.filter(i=>i.dir==="in").length,out:all.filter(i=>i.dir==="out").length,overdue:all.filter(i=>i.overdue).length,tasks:open.length,today:open.filter(t=>t.due&&t.due<=todayISO()).length};
 }
@@ -586,10 +652,11 @@ function renderGlance(){
 }
 
 /* ---------------- Inbox view ---------------- */
-function visible(src){
+function filtered(src,actionOnly){
   const q=S.q.toLowerCase();
-  return (S.items[src]||[]).filter(i=>(S.dir==="all"||i.dir===S.dir)&&(S.settings.showDone||!S.ui.done[keyOf(i)])&&(!q||(i.title+" "+i.body+" "+i.person+" "+i.where).toLowerCase().includes(q)));
+  return (S.items[src]||[]).filter(i=>(S.dir==="all"||i.dir===S.dir)&&(S.settings.showDone||!S.ui.done[keyOf(i)])&&(!actionOnly||need(i))&&(!q||(i.title+" "+i.body+" "+i.person+" "+i.where).toLowerCase().includes(q)));
 }
+function visible(src){return filtered(src,S.settings.actionOnly&&!S.showAll[src])}
 function itemRow(it){
   const k=keyOf(it), done=!!S.ui.done[k], rem=S.ui.reminded[k], openMode=S.open[k];
   const meta=[el("span",{class:"pill "+it.dir,text:it.dir==="in"?"For me":"Waiting on "+(it.person||"them").split(",")[0]})];
@@ -602,6 +669,7 @@ function itemRow(it){
   if(it.replies) meta.push(el("span",{text:it.replies+" replies"}));
   if(it.time) meta.push(el("span",{class:"mono",text:ago(it.time)}));
   if(rem) meta.push(el("span",{class:"pill good",text:"Reminded "+ago(rem)}));
+  if((it.src==="slack"||it.src==="gmail")&&!need(it)) meta.unshift(el("span",{class:"pill",text:"No action · "+whyHidden(it)}));
   const canReply=["slack","linear","gmail"].includes(it.src);
   const acts=el("div",{class:"acts"},
     canReply?el("button",{class:"btn sm",type:"button",onclick:()=>{S.open[k]=openMode==="reply"?null:"reply";renderInbox()}},"Reply"):null,
@@ -612,7 +680,7 @@ function itemRow(it){
     el("button",{class:"btn sm ghost",type:"button",onclick:()=>toTask(it)},"+ Task"),
     it.url?el("a",{class:"btn sm ghost",href:it.url,target:"_blank",rel:"noopener"},"Open ↗"):null);
   const body=el("div",{style:"min-width:0"},el("div",{class:"it-t",text:it.title}),
-    it.body&&it.body!==it.title?el("div",{class:"it-x",text:it.body}):null,el("div",{class:"it-m"},meta),acts);
+    it.body&&it.body!==it.title?el("div",{class:"it-x",text:it.body}):null,askOf(it)&&need(it)?el("div",{class:"note",style:"margin-top:4px;color:var(--accent)",text:"→ "+askOf(it)}):null,el("div",{class:"it-m"},meta),acts);
   if(openMode==="reply") body.append(composer(it));
   if(openMode==="react") body.append(el("div",{class:"emo"},EMOJI.map(([n,g])=>el("button",{type:"button",title:":"+n+":",onclick:()=>react(it,n)},g))));
   const cb=el("input",{type:"checkbox","aria-label":"Select",onchange:e=>{e.target.checked?S.sel.add(k):S.sel.delete(k);renderBulk()}}); cb.checked=S.sel.has(k);
@@ -661,8 +729,8 @@ function renderInbox(){
       g.append(card);continue;
     }
     const st=S.status[s.key], items=visible(s.key), all=S.items[s.key]||[];
-    const ni=all.filter(i=>i.dir==="in"&&!S.ui.done[keyOf(i)]).length, no=all.filter(i=>i.dir==="out"&&!S.ui.done[keyOf(i)]).length;
-    head.lastChild.append(el("div",{class:"cnt mono",text:st==="ok"||all.length?`${ni} for you · ${no} waiting on others`:st==="loading"?"Loading…":""}));
+    const act=i=>!S.ui.done[keyOf(i)]&&(!S.settings.actionOnly||need(i)); const ni=all.filter(i=>i.dir==="in"&&act(i)).length, no=all.filter(i=>i.dir==="out"&&act(i)).length;
+    head.lastChild.append(el("div",{class:"cnt mono",text:st==="ok"||all.length?`${ni} need you · ${no} waiting on others`+(S.triaging[s.key]?" · Claude is checking…":""):st==="loading"?"Loading…":""}));
     const selAll=el("button",{class:"btn sm ghost",type:"button",onclick:()=>{const ks=items.map(keyOf);const allSel=ks.every(k=>S.sel.has(k));ks.forEach(k=>allSel?S.sel.delete(k):S.sel.add(k));renderInbox();renderBulk()}},"Select all");
     head.append(el("div",{class:"r"},el("span",{class:"state",text:S.at[s.key]?ago(S.at[s.key]):""}),items.length?selAll:null,
       el("button",{class:"btn sm",type:"button",onclick:()=>load(s.key,true),disabled:st==="loading"},st==="error"&&S.err[s.key]&&S.err[s.key].code==="approval_required"?"Load":"Refresh")));
@@ -670,9 +738,16 @@ function renderInbox(){
     const list=el("div",{class:"list"});
     if(items.length) items.forEach(i=>list.append(itemRow(i)));
     else if(st==="loading") list.append(el("div",{class:"empty",style:"margin:14px",text:`Loading ${s.name}…`}));
-    else if(st==="ok") list.append(el("div",{class:"empty",style:"margin:14px",text:S.q?"Nothing matches your search.":S.dir==="out"?"Nobody is waiting on a reply from this source.":"You're clear here."}));
+    else if(st==="ok") list.append(el("div",{class:"empty",style:"margin:14px",text:S.q?"Nothing matches your search.":S.dir==="out"?"Nothing you're waiting on here.":"Nothing needs your action here."}));
     else if(!S.cap.mcp&&st!=="error") list.append(el("div",{class:"empty",style:"margin:14px",text:"Live items load when you open Fiza on claude.ai."}));
-    card.append(list); g.append(card);
+    card.append(list);
+    if(S.settings.actionOnly&&(s.key==="slack"||s.key==="gmail")&&all.length){
+      const hidden=filtered(s.key,false).length-filtered(s.key,true).length;
+      if(hidden>0||S.showAll[s.key]) card.append(el("div",{class:"note",style:"padding:9px 14px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap"},
+        S.showAll[s.key]?`Showing everything, including ${hidden} that don't need action.`:`${hidden} hidden: FYIs, announcements, automated mail, and threads you've already replied to.`,
+        el("button",{class:"link btn sm ghost",type:"button",onclick:()=>{S.showAll[s.key]=!S.showAll[s.key];renderInbox()}},S.showAll[s.key]?"Show only what needs action":"Show all")));
+    }
+    g.append(card);
   }
   if(!g.children.length) g.append(el("div",{class:"empty",style:"grid-column:1/-1"},"Every connector is switched off. Turn them on under ",el("a",{href:"#admin"},"Admin"),"."));
 }
@@ -797,8 +872,12 @@ function setS(path,val){
   saveSettings(); applyTheme(); renderAll();
 }
 function tog(id,label,note,path){
+  if(path==="aiTriage"||path==="actionOnly") return togBase(id,label,note,path,()=>{if(S.settings.aiTriage){triage("slack");triage("gmail")}});
+  return togBase(id,label,note,path);
+}
+function togBase(id,label,note,path,after){
   const v=path.split(".").reduce((o,k)=>o&&o[k],S.settings);
-  const cb=el("input",{type:"checkbox",class:"sw",id,onchange:e=>{setS(path,e.target.checked);if(path.startsWith("sources.")||["slackMentions","slackDMs","gmailImportant","linearDone"].includes(path)){const src=path.split(".")[1];if(FETCH[src])load(src);else if(path.startsWith("slack"))load("slack");else if(path.startsWith("gmail"))load("gmail");else if(path.startsWith("linear"))load("linear")}}}); cb.checked=v!==false;
+  const cb=el("input",{type:"checkbox",class:"sw",id,onchange:e=>{setS(path,e.target.checked);if(path.startsWith("sources.")||["slackMentions","slackDMs","gmailImportant","linearDone"].includes(path)){const src=path.split(".")[1];if(FETCH[src])load(src);else if(path.startsWith("slack"))load("slack");else if(path.startsWith("gmail"))load("gmail");else if(path.startsWith("linear"))load("linear")}if(after)after()}}); cb.checked=v!==false;
   return el("div",{class:"tog"},el("label",{for:id},el("b",{text:label}),note?el("span",{class:"note",text:note}):null),cb);
 }
 function renderAdmin(){
@@ -814,6 +893,8 @@ function renderAdmin(){
   const sid=el("input",{class:"inp",id:"slackId",value:S.settings.slackUserId||"",placeholder:"e.g. U01ABCDE23",onchange:e=>{setS("slackUserId",e.target.value.trim());load("slack")}});
   const mail=el("input",{class:"inp",id:"myEmail",value:S.settings.myEmail||"",placeholder:"you@transak.com",onchange:e=>{setS("myEmail",e.target.value.trim());load("gmail")}});
   g.append(el("section",{class:"panel"},el("h3",{text:"Connectors"}),el("p",{class:"note",text:"Switch a source off to hide its card and stop loading it."}),
+    tog("opt-act","Only show what needs action","Hide FYIs, announcements, automated mail and threads you've already replied to","actionOnly"),
+    tog("opt-ai","Let Claude decide what needs action","Claude reads each remaining Slack message and email and writes a one-line ask","aiTriage"),
     tog("src-slack","Slack","Mentions, DMs and your requests to others","sources.slack"),
     tog("opt-sm","Slack · channel mentions","Messages that @mention you","slackMentions"),
     tog("opt-sd","Slack · direct messages","DMs sent to you","slackDMs"),
@@ -873,6 +954,8 @@ renderAll();
           if(mcp) loadAll(); schedule();
         }
       },()=>{if(first){first=false;if(mcp)loadAll()}});
+      triageRef=db.doc(`data/users/${uid}/triage`);
+      triageRef.get().then(s=>{if(s.exists){S.triage=Object.assign((s.data()||{}).m||{},S.triage);renderInbox();renderGlance()}}).catch(()=>{});
       stateRef.onSnapshot(s=>{const d=s.exists?s.data():{};S.ui.done=d.done||{};S.ui.reminded=d.reminded||{};renderInbox();renderGlance()});
       tasksCol.onSnapshot(s=>{S.tasks=s.docs.map(d=>({id:d.id,...d.data()}));renderTasks();renderGlance()},()=>{S.tasks=[];renderTasks()});
       return;
