@@ -1,0 +1,886 @@
+<title>Fiza</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky orbit header with tabs → one view per tab. Artifacts = 6-col card grid; Work inbox = one card per connector; tokens are re-written by the planet theme engine. */
+:root{
+  --bg:hsl(212 30% 96.5%);--surf:hsl(212 30% 99.5%);--surf2:hsl(212 35% 93%);--line:hsl(212 18% 85%);
+  --fg:hsl(212 25% 12%);--muted:hsl(212 10% 40%);--accent:hsl(168 60% 30%);--accent-ink:hsl(168 30% 98%);
+  --accent2:hsl(205 50% 40%);--soft:hsla(168 60% 30% / .10);
+  --good:hsl(150 60% 30%);--warn:hsl(35 85% 36%);--bad:hsl(0 65% 45%);
+  --orb1:#9fd3ff;--orb2:#2f6fb3;--orb3:#0c2a4a;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:hsl(212 35% 7%);--surf:hsl(212 35% 10.5%);--surf2:hsl(212 35% 14%);--line:hsl(212 28% 20%);
+  --fg:hsl(212 15% 92%);--muted:hsl(212 10% 64%);--accent:hsl(168 60% 62%);--accent-ink:hsl(168 60% 10%);
+  --accent2:hsl(205 55% 68%);--soft:hsla(168 60% 62% / .14);
+  --good:hsl(150 55% 60%);--warn:hsl(40 85% 62%);--bad:hsl(0 75% 66%);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:hsl(212 35% 7%);--surf:hsl(212 35% 10.5%);--surf2:hsl(212 35% 14%);--line:hsl(212 28% 20%);
+  --fg:hsl(212 15% 92%);--muted:hsl(212 10% 64%);--accent:hsl(168 60% 62%);--accent-ink:hsl(168 60% 10%);
+  --accent2:hsl(205 55% 68%);--soft:hsla(168 60% 62% / .14);
+  --good:hsl(150 55% 60%);--warn:hsl(40 85% 62%);--bad:hsl(0 75% 66%);color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surf)}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* header */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surf);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;padding-block:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:6px}
+.orb{width:30px;height:30px;border-radius:50%;flex:none;position:relative;background:radial-gradient(circle at 32% 30%,var(--orb1),var(--orb2) 55%,var(--orb3));box-shadow:inset -4px -5px 10px rgba(0,0,0,.35)}
+.orb.ring::after{content:"";position:absolute;left:-30%;right:-30%;top:42%;height:16%;border-radius:50%;border:2px solid var(--orb1);opacity:.8;transform:rotate(-14deg)}
+.orb.bands{background:repeating-linear-gradient(170deg,transparent 0 5px,rgba(0,0,0,.14) 5px 8px),radial-gradient(circle at 32% 30%,var(--orb1),var(--orb2) 55%,var(--orb3))}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:-.01em;margin:0}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-top:-3px}
+nav.tabs{display:flex;gap:2px;background:var(--surf2);border-radius:999px;padding:3px;overflow-x:auto;max-width:100%}
+nav.tabs a{text-decoration:none;color:var(--muted);padding:6px 14px;border-radius:999px;white-space:nowrap;font-weight:500;font-size:13px}
+nav.tabs a[aria-current="page"]{background:var(--surf);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.top .spacer{flex:1}
+.sync{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surf);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--fg);background:var(--surf2)}
+.btn.sm{padding:3px 8px;font-size:12px;border-radius:6px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+main{padding-block:22px 80px}
+.view[hidden]{display:none!important}
+h2.vh{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:-.015em;margin:0;text-wrap:balance}
+.vsub{color:var(--muted);margin:2px 0 18px;max-width:70ch}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+/* glance */
+.glance{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.gl{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;text-align:left}
+.gl:hover{border-color:var(--accent)}
+.gl b{display:block;font-family:var(--f-display);font-size:28px;line-height:1.1;font-weight:700}
+.gl span{color:var(--muted);font-size:12px}
+/* artifact cards */
+.agrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.acard{grid-column:span 2;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.acard.wide{grid-column:span 3}
+.acard header{display:flex;align-items:flex-start;gap:10px}
+.acard h3{font-family:var(--f-display);font-size:18px;margin:0;font-weight:700;letter-spacing:-.01em}
+.acard .per{color:var(--muted);font-size:12px}
+.acard header .open{margin-left:auto}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kpi{background:var(--surf2);border-radius:8px;padding:9px 11px;min-width:0}
+.kpi .l{font-size:11.5px;color:var(--muted);line-height:1.3}
+.kpi .v{font-family:var(--f-display);font-size:24px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;font-family:var(--f-mono)}
+.up-good,.down-good{color:var(--good)} .up-bad,.down-bad{color:var(--bad)} .flat{color:var(--muted)}
+.spark{width:100%;height:56px;display:block}
+.acard .foot{margin-top:auto;display:flex;gap:8px;align-items:center;color:var(--muted);font-size:11.5px;flex-wrap:wrap}
+.drivers{display:flex;flex-direction:column;gap:5px}
+.drv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-size:12.5px;align-items:center}
+.drv .bar{grid-column:1/-1;height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
+.drv .bar i{display:block;height:100%;background:var(--accent2)}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:18px;color:var(--muted);text-align:center;font-size:13px}
+/* inbox */
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--surf2);border-radius:8px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:5px 11px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:500;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--surf);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.inp{border:1px solid var(--line);background:var(--surf);border-radius:8px;padding:6px 10px;min-width:0}
+.inp:focus{border-color:var(--accent);outline:none}
+.cgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ccard{background:var(--surf);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.ccard>header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.logo{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:#fff;font-size:14px;flex:none}
+.ccard h3{margin:0;font-size:15px;font-family:var(--f-display);font-weight:700}
+.ccard .cnt{color:var(--muted);font-size:12px}
+.ccard header .r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.state{font-size:11.5px;color:var(--muted)}
+.list{max-height:560px;overflow:auto}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item.done{opacity:.55}
+.item input[type=checkbox]{margin-top:3px;accent-color:var(--accent)}
+.it-t{font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.it-x{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+.it-m{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;background:var(--surf2);color:var(--muted);white-space:nowrap}
+.pill.in{background:var(--soft);color:var(--accent)}
+.pill.out{background:color-mix(in srgb,var(--accent2) 16%,transparent);color:var(--accent2)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.pill.good{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good)}
+.acts{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+.composer{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.composer textarea{width:100%;min-height:76px;resize:vertical;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:8px}
+.composer .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.emo{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+.emo button{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:2px 9px;cursor:pointer;font-size:15px}
+.emo button:hover{border-color:var(--accent)}
+.note{font-size:12px;color:var(--muted)}
+.err{font-size:12.5px;color:var(--bad);padding:12px 14px}
+.okmsg{color:var(--good)}
+.bulk{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;background:var(--fg);color:var(--bg);border-radius:12px;padding:8px 10px 8px 16px;display:flex;gap:8px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:calc(100% - 32px);flex-wrap:wrap}
+.bulk .btn{background:transparent;color:var(--bg);border-color:color-mix(in srgb,var(--bg) 35%,transparent)}
+.bulk .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:grid;place-items:center;padding:16px}
+.modal{background:var(--surf);border:1px solid var(--line);border-radius:14px;width:min(640px,100%);max-height:88vh;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.modal h3{margin:0;font-family:var(--f-display);font-size:20px}
+.rlist{border:1px solid var(--line);border-radius:8px;max-height:240px;overflow:auto}
+.rlist div{padding:7px 10px;border-bottom:1px solid var(--line);font-size:12.5px;display:flex;gap:8px;align-items:center}
+.rlist div:last-child{border-bottom:0}
+/* tasks */
+.addtask{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1.2fr) minmax(0,1fr) auto;gap:8px;background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:16px}
+.tsec{margin-bottom:18px}
+.tsec h4{margin:0 0 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.trow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px}
+.trow.done .tt{text-decoration:line-through;color:var(--muted)}
+.tt{font-weight:600;overflow-wrap:anywhere}
+/* admin */
+.agrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.panel{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.panel h3{margin:0 0 4px;font-family:var(--f-display);font-size:17px}
+.panel>.note{margin:0 0 10px}
+.tog{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.tog:first-of-type{border-top:0}
+.tog label{flex:1;min-width:0}
+.tog .note{display:block}
+.sw{appearance:none;width:38px;height:22px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--surf);transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.sw:checked{background:var(--accent)}
+.sw:checked::after{transform:translateX(16px)}
+.planets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.planet{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;background:var(--surf);text-align:left}
+.planet[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.planet .orb{width:26px;height:26px}
+.planet b{display:block;font-size:13px}
+.planet span{font-size:11px;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:4px;padding:8px 0}
+.field textarea{min-height:70px;resize:vertical}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:calc(70px + env(safe-area-inset-top,0px));z-index:40;background:var(--fg);color:var(--bg);border-radius:10px;padding:9px 14px;font-size:13px;max-width:min(380px,calc(100% - 32px));box-shadow:0 8px 24px rgba(0,0,0,.25)}
+@media (max-width:980px){.agrid{grid-template-columns:repeat(2,minmax(0,1fr))}.acard,.acard.wide{grid-column:span 1}.cgrid,.agrid2{grid-template-columns:minmax(0,1fr)}.glance{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.agrid{grid-template-columns:minmax(0,1fr)}.addtask{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.addtask .t{grid-column:1/-1}.planets{grid-template-columns:repeat(2,minmax(0,1fr))}.sync .lbl{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><div class="orb" id="hdrOrb"></div><div><h1>Fiza</h1><small id="hdrPlanet">Earth</small></div></div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#artifacts" data-tab="artifacts">Artifacts</a>
+      <a href="#inbox" data-tab="inbox">Work inbox</a>
+      <a href="#mytasks" data-tab="mytasks">My tasks</a>
+      <a href="#admin" data-tab="admin">Admin</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="sync"><span class="lbl" id="syncLbl">Connecting…</span><button class="btn sm" id="refreshAll" type="button">Refresh</button></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ARTIFACTS -->
+  <section class="view" id="v-artifacts">
+    <h2 class="vh">Your dashboards at a glance</h2>
+    <p class="vsub" id="artSub">CSAT, quality, O2C and voice of customer in one place. Each card opens the full dashboard.</p>
+    <div class="glance" id="glance"></div>
+    <div class="agrid" id="agrid"><div class="empty" style="grid-column:1/-1">Loading dashboard snapshots…</div></div>
+  </section>
+
+  <!-- INBOX -->
+  <section class="view" id="v-inbox" hidden>
+    <h2 class="vh">Work inbox</h2>
+    <p class="vsub" id="inboxSub">Everything assigned to you, and everything you've assigned to others, across your tools.</p>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Direction">
+        <button type="button" data-dir="in" aria-pressed="true">Waiting on me</button>
+        <button type="button" data-dir="out" aria-pressed="false">Waiting on others</button>
+        <button type="button" data-dir="all" aria-pressed="false">All</button>
+      </div>
+      <input class="inp" id="q" type="search" placeholder="Search titles, people, channels" style="flex:1;min-width:180px">
+      <label class="note" for="since">Since</label><input class="inp" id="since" type="date">
+      <button class="btn" type="button" id="remindAll">Remind everyone waiting</button>
+    </div>
+    <div class="cgrid" id="cgrid"></div>
+  </section>
+
+  <!-- MY TASKS -->
+  <section class="view" id="v-mytasks" hidden>
+    <h2 class="vh">My tasks</h2>
+    <p class="vsub">Your personal list. Tasks are private to you. Reminders arrive as a Slack DM from you to yourself.</p>
+    <form class="addtask" id="addTask" autocomplete="off">
+      <input class="inp t" id="tTitle" placeholder="Add a task, e.g. Review Oct RiskOps fatals with Preethi" required>
+      <input class="inp" id="tDue" type="date" aria-label="Due date">
+      <select class="inp" id="tPri" aria-label="Priority"><option value="2">High</option><option value="3" selected>Medium</option><option value="4">Low</option></select>
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    <div class="toolbar">
+      <button class="btn" type="button" id="schedAll">Schedule Slack reminders for all open tasks</button>
+      <button class="btn" type="button" id="digestNow">Send me a digest on Slack now</button>
+      <span class="note" id="taskNote"></span>
+    </div>
+    <div id="tasks"><div class="empty">Loading your tasks…</div></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section class="view" id="admin-view" hidden>
+    <h2 class="vh">Admin</h2>
+    <p class="vsub">Turn cards and connectors on or off, set reminder wording and pick a planet. Changes save automatically and only affect your view.</p>
+    <div class="agrid2" id="adminGrid"></div>
+  </section>
+</main>
+
+<div id="bulk" class="bulk" hidden></div>
+<div id="toast" class="toast" hidden role="status"></div>
+<div id="modalHost"></div>
+
+<script>
+(() => {
+"use strict";
+/* ---------------- constants ---------------- */
+const PLANETS = {
+  mercury:{name:"Mercury",tag:"Cratered grey, amber",h:30,s:6,a:34,as:72,a2:210,orb:["#e9e3da","#9a9188","#3b3632"]},
+  venus:{name:"Venus",tag:"Sulphur haze",h:42,s:28,a:40,as:82,a2:12,orb:["#fff1c4","#e0b45c","#7a5420"]},
+  earth:{name:"Earth",tag:"Ocean and forest",h:212,s:35,a:168,as:60,a2:205,orb:["#9fd3ff","#2f6fb3","#0c2a4a"]},
+  mars:{name:"Mars",tag:"Iron-oxide dust",h:12,s:28,a:14,as:76,a2:32,orb:["#ffb08a","#c2502a","#4a170a"]},
+  jupiter:{name:"Jupiter",tag:"Banded storms",h:30,s:22,a:24,as:62,a2:200,orb:["#f4dfc2","#c08a5a","#5c3a22"],bands:true},
+  saturn:{name:"Saturn",tag:"Pale gold rings",h:46,s:16,a:44,as:62,a2:262,orb:["#fbefc9","#cfb27a","#6b5630"],ring:true},
+  uranus:{name:"Uranus",tag:"Methane cyan",h:186,s:28,a:182,as:62,a2:150,orb:["#d8fbff","#6fd0d8","#1f6a72"],ring:true},
+  neptune:{name:"Neptune",tag:"Deep wind blue",h:228,s:42,a:224,as:82,a2:192,orb:["#a9c4ff","#3a5be0","#0f1c5c"]},
+  pluto:{name:"Pluto",tag:"Rose ice",h:330,s:14,a:340,as:52,a2:200,orb:["#ffe4ea","#c99aa6","#5a3a44"]}
+};
+const ARTS = [
+  {key:"csat",title:"CSAT",url:"https://claude.ai/artifact/WSDS1QjJrstwetmfqhbH8P",wide:true},
+  {key:"voc",title:"Voice of customer",url:"https://claude.ai/artifact/V5Vi6DxPE5i8q3wLBHA6Cr",wide:true},
+  {key:"cs_quality",title:"CS/OPS Quality",url:"https://claude.ai/artifact/VxEY8nvReDxDuSq8WV3iHS"},
+  {key:"risk_quality",title:"RiskOps Quality",url:"https://claude.ai/artifact/KdyrxEWnwJ596anPCxXg5j"},
+  {key:"o2c",title:"O2C · Inbound CS",url:"https://claude.ai/artifact/NJRte9tZthPa7HvFeURfhy"}
+];
+const SOURCES = [
+  {key:"slack",name:"Slack",server:"Slack",color:"#611f69",mark:"S"},
+  {key:"linear",name:"Linear",server:"Linear",color:"#5e6ad2",mark:"L"},
+  {key:"gmail",name:"Gmail",server:"Gmail",color:"#c5221f",mark:"G"},
+  {key:"rp",name:"Revolut People",server:"revolut-people",color:"#191c1f",mark:"R"},
+  {key:"bamboo",name:"BambooHR",server:null,color:"#73c41d",mark:"B"}
+];
+const DEFAULTS = {
+  since:"2026-10-26", theme:"earth", mode:"system",
+  cards:{csat:true,voc:true,cs_quality:true,risk_quality:true,o2c:true},
+  sources:{slack:true,linear:true,gmail:true,rp:true,bamboo:true},
+  slackMentions:true, slackDMs:true, gmailImportant:false, linearDone:false, showDone:false,
+  refreshMin:30, reminderTime:"09:30",
+  template:"Hi {name}, gentle reminder on \"{title}\". Could you share an update{due}? Thanks!",
+  slackUserId:"", myEmail:""
+};
+const EMOJI = [["white_check_mark","✅"],["eyes","👀"],["+1","👍"],["pray","🙏"],["raised_hands","🙌"],["fire","🔥"],["heart","❤️"]];
+
+/* ---------------- state ---------------- */
+const S = {
+  settings: structuredClone(DEFAULTS), kpis:{}, kpisLoaded:false,
+  items:{slack:[],linear:[],gmail:[],rp:[]}, status:{}, err:{}, at:{},
+  dir:"in", q:"", sel:new Set(), open:{}, ui:{done:{},reminded:{}},
+  tasks:null, me:{}, cap:{}, uid:null
+};
+let stateRef=null, settingsRef=null, tasksCol=null;
+
+/* ---------------- helpers ---------------- */
+const use=n=>{try{return window.claude&&window.claude.use?window.claude.use(n).catch(()=>null):Promise.resolve(null)}catch{return Promise.resolve(null)}};
+const $ = s => document.querySelector(s);
+function el(tag, attrs, ...kids){
+  const n=document.createElement(tag);
+  if(attrs) for(const [k,v] of Object.entries(attrs)){
+    if(v==null||v===false) continue;
+    if(k==="class") n.className=v; else if(k==="text") n.textContent=v;
+    else if(k.startsWith("on")) n.addEventListener(k.slice(2),v);
+    else if(k==="style") n.style.cssText=v; else n.setAttribute(k,v===true?"":v);
+  }
+  for(const c of kids.flat()) if(c!=null&&c!==false) n.append(c.nodeType?c:document.createTextNode(String(c)));
+  return n;
+}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,3800)}
+function ago(ms){if(!ms)return"";const d=(Date.now()-ms)/1000;if(d<60)return"just now";if(d<3600)return Math.round(d/60)+"m ago";if(d<86400)return Math.round(d/3600)+"h ago";return Math.round(d/86400)+"d ago"}
+function fmtDate(iso){if(!iso)return"";const d=new Date(iso.length===10?iso+"T00:00:00":iso);return d.toLocaleDateString(undefined,{day:"numeric",month:"short"})}
+function todayISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function addDays(iso,n){const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function initials(n){return (n||"?").split(/[\s.@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join("")}
+function cleanSlack(t){return (t||"").replace(/<@U\w+\|([^>]+)>/g,"@$1").replace(/<@(U\w+)>/g,"@$1").replace(/<!(\w+)>/g,"@$1").replace(/<(https?:[^|>]+)\|([^>]+)>/g,"$2").replace(/<(https?:[^>]+)>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").trim()}
+function parseSlackTime(s){const m=/(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)\s*(\w+)?/.exec(s||"");if(!m)return 0;const tz={IST:"+05:30",UTC:"Z",GMT:"Z"}[m[3]]||"Z";return Date.parse(m[1]+"T"+m[2]+tz)||0}
+const debounce=(f,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>f(...a),ms)}};
+function keyOf(it){return it.src+":"+it.id}
+
+/* ---------------- theme ---------------- */
+function palette(p,dark){
+  const P=PLANETS[p]||PLANETS.earth,{h,s,a,as,a2}=P;
+  return dark?{
+    "--bg":`hsl(${h} ${s}% 7%)`,"--surf":`hsl(${h} ${s}% 10.5%)`,"--surf2":`hsl(${h} ${s}% 14.5%)`,"--line":`hsl(${h} ${Math.round(s*.8)}% 21%)`,
+    "--fg":`hsl(${h} 15% 92%)`,"--muted":`hsl(${h} 10% 64%)`,"--accent":`hsl(${a} ${as}% 64%)`,"--accent-ink":`hsl(${a} ${as}% 10%)`,
+    "--accent2":`hsl(${a2} 55% 70%)`,"--soft":`hsla(${a} ${as}% 64% / .15)`,"--good":"hsl(150 55% 60%)","--warn":"hsl(40 85% 62%)","--bad":"hsl(0 75% 66%)"
+  }:{
+    "--bg":`hsl(${h} ${Math.min(s,30)}% 96.5%)`,"--surf":`hsl(${h} 30% 99.5%)`,"--surf2":`hsl(${h} ${Math.max(s,12)}% 92.5%)`,"--line":`hsl(${h} 18% 85%)`,
+    "--fg":`hsl(${h} 25% 12%)`,"--muted":`hsl(${h} 10% 40%)`,"--accent":`hsl(${a} ${as}% 34%)`,"--accent-ink":`hsl(${a} 30% 98%)`,
+    "--accent2":`hsl(${a2} 50% 38%)`,"--soft":`hsla(${a} ${as}% 34% / .10)`,"--good":"hsl(150 60% 28%)","--warn":"hsl(35 85% 34%)","--bad":"hsl(0 65% 44%)"
+  };
+}
+function isDark(){
+  const m=S.settings.mode;
+  if(m==="dark")return true; if(m==="light")return false;
+  const host=document.documentElement.getAttribute("data-theme");
+  if(host==="dark")return true; if(host==="light")return false;
+  return matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function orbStyle(n,p){const P=PLANETS[p]||PLANETS.earth;n.style.setProperty("--orb1",P.orb[0]);n.style.setProperty("--orb2",P.orb[1]);n.style.setProperty("--orb3",P.orb[2]);n.classList.toggle("ring",!!P.ring);n.classList.toggle("bands",!!P.bands)}
+function applyTheme(){
+  const p=S.settings.theme, dark=isDark(), root=document.documentElement;
+  for(const [k,v] of Object.entries(palette(p,dark))) root.style.setProperty(k,v);
+  root.style.colorScheme=dark?"dark":"light";
+  orbStyle($("#hdrOrb"),p); $("#hdrPlanet").textContent=(PLANETS[p]||PLANETS.earth).name;
+  try{localStorage.setItem("fiza.theme",JSON.stringify({theme:p,mode:S.settings.mode}))}catch{}
+}
+try{const c=JSON.parse(localStorage.getItem("fiza.theme")||"null");if(c){S.settings.theme=c.theme;S.settings.mode=c.mode}}catch{}
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+/* ---------------- routing ---------------- */
+const TABS=["artifacts","inbox","mytasks","admin"];
+function route(){
+  const h=(location.hash||"#artifacts").slice(1), t=TABS.includes(h)?h:"artifacts";
+  for(const x of TABS){const v=document.getElementById(x==="admin"?"admin-view":"v-"+x);v.hidden=x!==t}
+  document.querySelectorAll("nav.tabs a").forEach(a=>{if(a.dataset.tab===t)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+}
+addEventListener("hashchange",route); route();
+
+/* ---------------- MCP ---------------- */
+async function call(server,tool,input,{read=true,fresh=false}={}){
+  if(!S.cap.mcp) throw {code:"capability_disabled",message:"Connector access is not available in this view."};
+  const opts=read?{cache:{staleTime:fresh?0:5*60e3,gcTime:24*3600e3,refresh:fresh}}:{cache:false};
+  const r=await S.cap.mcp.callTool(server,tool,input,opts);
+  return r.payload!==undefined?r.payload:r;
+}
+function errText(e,server){
+  const n=server||"this connector";
+  switch(e&&e.code){
+    case "needs_reauth":return `Reconnect ${n} in claude.ai Settings → Connectors.`;
+    case "server_not_connected":return `${n} isn't connected. Add it in claude.ai Settings → Connectors.`;
+    case "selection_required":return `You have more than one ${n} connector. Choose one when claude.ai asks, then refresh.`;
+    case "not_in_manifest":return `${n} is switched off for this page. Turn it on under Admin → Connector access.`;
+    case "approval_required":return `${n} needs your approval. Click Load to allow it.`;
+    case "blocked_by_policy":return `Your organisation's policy blocks this ${n} action.`;
+    case "server_unavailable":return `${n} didn't answer. Try Refresh in a minute.`;
+    case "not_granted":case "capability_disabled":case "capability_removed":return "Connector access isn't available here. Open Fiza on claude.ai to load live data.";
+    case "tool_error":return (e.message||"The tool reported an error.").slice(0,240);
+    default:return (e&&e.message)||"Something went wrong loading this.";
+  }
+}
+
+/* ---------------- fetchers ---------------- */
+function slackParse(payload){
+  const text=typeof payload==="string"?payload:(payload&&payload.results)||"";
+  const out=[];
+  for(const p of text.split(/\n### Result \d+ of \d+\n/).slice(1)){
+    const g=r=>{const m=r.exec(p);return m?m.slice(1):null};
+    const ch=g(/Channel: (.*?) \(ID: (\w+)\)/)||["",""];
+    const from=g(/From: (.*?)(?: <([^>]*)>)? \(ID: (\w+)\)/)||["","",""];
+    const parts=g(/Participants: (.*)/);
+    const ts=(g(/Message_ts: ([\d.]+)/)||[""])[0];
+    const perm=(g(/Permalink: \[link\]\((.*?)\)/)||[""])[0];
+    const thread=(/thread_ts=([\d.]+)/.exec(perm)||[])[1];
+    const replies=+((g(/Reply count: (\d+)/)||["0"])[0]);
+    const body=(/Text: \n([\s\S]*?)(?:\n\n---|$)/.exec(p)||[])[1]||"";
+    out.push({channel:ch[0],channelId:ch[1],participants:parts?parts[0]:"",fromName:from[0],fromId:from[2],ts,threadTs:thread||ts,perm,replies,raw:body,time:parseSlackTime((g(/Time: (.*)/)||[""])[0])});
+  }
+  const cur=/cursor `([^`]+)`/.exec((payload&&payload.pagination_info)||"");
+  return {rows:out,cursor:cur?cur[1]:null};
+}
+async function slackSearch(input,pages,fresh){
+  let rows=[],cursor;
+  for(let i=0;i<pages;i++){
+    const r=slackParse(await call("Slack","slack_search_public_and_private",{...input,limit:20,include_context:false,sort:"timestamp",...(cursor?{cursor}:{})},{fresh}));
+    rows=rows.concat(r.rows); if(!r.cursor||!r.rows.length)break; cursor=r.cursor;
+  }
+  return rows;
+}
+async function fetchSlack(fresh){
+  const me=S.settings.slackUserId; if(!me) throw {code:"setup",message:"Add your Slack member ID under Admin → Connectors so Fiza can find your mentions."};
+  const after="after:"+addDays(S.settings.since,-1);
+  const jobs=[];
+  if(S.settings.slackMentions) jobs.push(slackSearch({keywords:[`<@${me}>`],filters:after,natural_language_query:""},3,fresh));
+  if(S.settings.slackDMs) jobs.push(slackSearch({filters:"is:dm "+after,natural_language_query:""},2,fresh));
+  jobs.push(slackSearch({filters:`from:<@${me}> ${after}`,natural_language_query:"asking someone to do a task, follow up or share an update"},3,fresh));
+  const res=await Promise.all(jobs); const outRows=res.pop(); const inRows=res.flat();
+  const seen=new Set(), items=[];
+  for(const r of inRows){
+    if(r.fromId===me) continue; const k=r.channelId+r.ts; if(seen.has(k))continue; seen.add(k);
+    const txt=cleanSlack(r.raw);
+    items.push({src:"slack",dir:"in",id:k,title:txt.split("\n")[0].slice(0,140)||"(message)",body:txt,person:r.fromName,where:r.channel==="DM"?"Direct message":r.channel,time:r.time,url:r.perm,channelId:r.channelId,ts:r.ts,threadTs:r.threadTs,replies:r.replies});
+  }
+  for(const r of outRows){
+    const others=[...r.raw.matchAll(/<@(U\w+)(?:\|([^>]+))?>/g)].filter(m=>m[1]!==me);
+    const isDM=r.channel==="DM";
+    if(!others.length&&!isDM) continue;
+    const k=r.channelId+r.ts; if(seen.has(k))continue; seen.add(k);
+    let who=others.map(m=>m[2]||m[1]).filter((v,i,a)=>a.indexOf(v)===i).join(", ");
+    if(!who&&isDM) who=(r.participants||"").split(",").map(s=>s.replace(/\(ID:.*?\)/,"").trim()).filter(n=>n&&n!==r.fromName).join(", ")||"DM";
+    const txt=cleanSlack(r.raw);
+    items.push({src:"slack",dir:"out",id:k,title:txt.split("\n")[0].slice(0,140)||"(message)",body:txt,person:who,firstName:(who.split(/[ ,]/)[0]||"there"),where:isDM?"Direct message":r.channel,time:r.time,url:r.perm,channelId:r.channelId,ts:r.ts,threadTs:r.threadTs,replies:r.replies});
+  }
+  return items.sort((a,b)=>b.time-a.time);
+}
+async function fetchLinear(fresh){
+  if(!S.me.linearName){try{const w=await call("Linear","whoami",{});S.me.linearName=w.user&&w.user.name}catch{}}
+  const fields=["id","title","url","status","statusType","priority","dueDate","assignee","createdBy","updatedAt","team"];
+  const base={updatedAt:S.settings.since,limit:100,fields,orderBy:"updatedAt"};
+  const [mine,mineMade]=await Promise.all([call("Linear","list_issues",{...base,assignee:"me"},{fresh}),call("Linear","list_issues",{...base,creator:"me"},{fresh})]);
+  const closed=t=>t==="completed"||t==="canceled";
+  const today=todayISO(), items=[];
+  const mk=(i,dir)=>({src:"linear",dir,id:i.id,title:i.title,body:"",person:dir==="in"?(i.createdBy||""):(i.assignee||"Unassigned"),firstName:((i.assignee||"").split(" ")[0]||"there"),
+    where:(i.team||"")+" · "+i.id,time:Date.parse(i.updatedAt)||0,url:i.url,status:i.status,statusType:i.statusType,
+    priority:i.priority&&i.priority.name,due:i.dueDate,overdue:!!(i.dueDate&&i.dueDate<today&&!closed(i.statusType)),closed:closed(i.statusType)});
+  for(const i of (mine.issues||[])){if(!S.settings.linearDone&&closed(i.statusType))continue;items.push(mk(i,"in"))}
+  for(const i of (mineMade.issues||[])){if(!i.assignee||i.assignee===S.me.linearName)continue;if(!S.settings.linearDone&&closed(i.statusType))continue;items.push(mk(i,"out"))}
+  return items.sort((a,b)=>(b.overdue-a.overdue)||(a.due||"9").localeCompare(b.due||"9")||b.time-a.time);
+}
+async function fetchGmail(fresh){
+  const d=S.settings.since.replace(/-/g,"/");
+  const my=(S.settings.myEmail||"").toLowerCase();
+  const qIn=`in:inbox after:${d} -category:promotions -category:social -category:forums`+(my?` -from:${my}`:"")+(S.settings.gmailImportant?" is:important":"");
+  const [a,b]=await Promise.all([call("Gmail","search_threads",{query:qIn,pageSize:40,view:"THREAD_VIEW_SUMMARY"},{fresh}),call("Gmail","search_threads",{query:`in:sent after:${d}`,pageSize:40,view:"THREAD_VIEW_SUMMARY"},{fresh})]);
+  const nameOf=(m,addr)=>{const x=(m.addressDisplayNames||[]).find(z=>(z.emailAddress||"").toLowerCase()===(addr||"").toLowerCase());return (x&&x.displayName)||addr||""};
+  const items=[],seen=new Set();
+  for(const t of (a.threads||[])){const m=(t.messages||[])[0];if(!m)continue;if(my&&(m.sender||"").toLowerCase()===my)continue;seen.add(t.id);
+    items.push({src:"gmail",dir:"in",id:t.id,title:m.subject||"(no subject)",body:m.snippet||"",person:nameOf(m,m.sender),where:(m.labelIds||[]).includes("UNREAD")?"Unread":"Inbox",unread:(m.labelIds||[]).includes("UNREAD"),time:Date.parse(m.date)||0,url:t.viewUrl||m.viewUrl,messageId:m.id,count:t.messageCount})}
+  for(const t of (b.threads||[])){const m=(t.messages||[])[0];if(!m||seen.has(t.id))continue;
+    const fromMe=my?(m.sender||"").toLowerCase()===my:true; if(!fromMe)continue;
+    const to=(m.toRecipients||[])[0]||""; const nm=nameOf(m,to);
+    items.push({src:"gmail",dir:"out",id:t.id,title:m.subject||"(no subject)",body:m.snippet||"",person:nm+((m.toRecipients||[]).length>1?` +${m.toRecipients.length-1}`:""),firstName:(nm.split(/[ @]/)[0]||"there"),where:"Awaiting reply",time:Date.parse(m.date)||0,url:t.viewUrl||m.viewUrl,messageId:m.id,count:t.messageCount})}
+  return items.sort((x,y)=>y.time-x.time);
+}
+async function fetchRP(fresh){
+  const ctx=await call("revolut-people","organization_get_current_employee_context",{},{fresh});
+  const eid=ctx.employee_id; S.me.rpName=ctx.full_name; const items=[];
+  const [goals,leave,meet]=await Promise.allSettled([
+    call("revolut-people","objectives_list_goals",{scope:"employee",employee_id:eid,limit:25},{fresh}),
+    call("revolut-people","time_off_list_time_off_requests",{approver_id:eid,status:["pending"],limit:25},{fresh}),
+    call("revolut-people","meetings_list_meetings",{employee_id:eid,date_from:S.settings.since,date_to:todayISO(),include_has_summary:true,status:"completed"},{fresh})
+  ]);
+  if(leave.status==="fulfilled") for(const r of (leave.value.requests||[])){
+    const who=(r.employee&&(r.employee.full_name||r.employee.name))||r.employee_name||"Team member";
+    items.push({src:"rp",dir:"in",id:"leave-"+(r.id||r.request_id),title:`Approve time off for ${who}`,body:[r.policy&&(r.policy.name||r.policy),r.from_date||r.start_date,r.to_date||r.end_date].filter(Boolean).join(" · "),person:who,where:"Time off approval",time:Date.parse(r.created_at||r.from_date||"")||Date.now(),url:"https://transak.revolutpeople.com",status:"Pending"});
+  }
+  if(goals.status==="fulfilled") for(const g of (goals.value.goals||[])){
+    items.push({src:"rp",dir:"in",id:"goal-"+g.goal_id,title:g.title,body:`${goals.value.cycle_label||""} goal · weight ${g.weight??"–"}% · ${g.active_kpis_count||0} KPIs`,person:(g.owner&&g.owner.full_name)||"",where:"Goal · "+(goals.value.cycle_label||""),time:0,url:"https://transak.revolutpeople.com/employees/performance-tab/"+eid,progress:g.progress_percent,status:(g.progress_percent??0)+"% done"});
+  }
+  if(meet.status==="fulfilled"){
+    const withNotes=(meet.value.meetings||[]).filter(m=>m.has_summary).slice(0,20);
+    if(withNotes.length){
+      try{
+        const notes=await call("revolut-people","meetings_get_meeting_notes",{meeting_ids:withNotes.map(m=>m.meeting_id)},{fresh});
+        const list=notes.meetings||notes.results||notes.notes||[];
+        for(const n of list){
+          const mt=withNotes.find(m=>m.meeting_id===(n.meeting_id||n.id))||{};
+          for(const [i,ai] of (n.action_items||n.actionItems||[]).entries()){
+            const txt=typeof ai==="string"?ai:(ai.text||ai.title||ai.description||"Action item");
+            const owner=typeof ai==="object"?((ai.assignee&&(ai.assignee.full_name||ai.assignee.name))||ai.owner||ai.assignee_name||""):"";
+            const mine=!owner||owner===S.me.rpName;
+            items.push({src:"rp",dir:mine?"in":"out",id:`ai-${mt.meeting_id}-${i}`,title:txt,body:"From "+(mt.title||"meeting"),person:owner||(mt.organizer&&mt.organizer.full_name)||"",firstName:(owner.split(" ")[0]||"there"),where:"Meeting action · "+fmtDate(mt.start),time:Date.parse(mt.start)||0,url:meet.value.meetings_url})
+          }
+        }
+      }catch(e){/* notes are optional */}
+    }
+  }
+  return items;
+}
+const FETCH={slack:fetchSlack,linear:fetchLinear,gmail:fetchGmail,rp:fetchRP};
+async function load(src,fresh=false){
+  if(!S.settings.sources[src]){S.items[src]=[];S.status[src]="off";renderInbox();return}
+  S.status[src]="loading";S.err[src]=null;renderInbox();
+  try{S.items[src]=await FETCH[src](fresh);S.status[src]="ok";S.at[src]=Date.now()}
+  catch(e){S.status[src]="error";S.err[src]=e;if(["needs_reauth","server_not_connected","not_in_manifest","blocked_by_policy"].includes(e&&e.code))S.items[src]=[]}
+  renderInbox();renderGlance();updateSync();
+}
+function loadAll(fresh=false){return Promise.all(["slack","linear","gmail","rp"].map(s=>load(s,fresh)))}
+function updateSync(){
+  const t=Object.values(S.at).filter(Boolean); const busy=Object.values(S.status).includes("loading");
+  $("#syncLbl").textContent=busy?"Syncing…":t.length?"Synced "+ago(Math.max(...t)):(S.cap.mcp?"Ready":"Live data needs claude.ai");
+}
+
+/* ---------------- actions ---------------- */
+async function sendReply(it,text){
+  if(it.src==="slack") return call("Slack","slack_send_message",{channel_id:it.channelId,thread_ts:it.threadTs,message:text},{read:false});
+  if(it.src==="linear") return call("Linear","save_comment",{issueId:it.id,body:text},{read:false});
+  if(it.src==="gmail") return call("Gmail","reply",{messageId:it.messageId,body:text,replyAll:true},{read:false});
+  throw {code:"tool_error",message:"Replies aren't supported for this source yet. Use Open."};
+}
+function fillTemplate(it,tpl){
+  return (tpl||S.settings.template).replace(/\{name\}/g,it.firstName||"there").replace(/\{title\}/g,it.title.slice(0,90)).replace(/\{due\}/g,it.due?` by ${fmtDate(it.due)}`:"");
+}
+async function saveUI(){if(stateRef){try{await stateRef.set({done:S.ui.done,reminded:S.ui.reminded})}catch(e){}}}
+const saveUIsoon=debounce(saveUI,600);
+function markDone(it,on=true){if(on)S.ui.done[keyOf(it)]=Date.now();else delete S.ui.done[keyOf(it)];S.sel.delete(keyOf(it));saveUIsoon();renderInbox();renderGlance();renderBulk()}
+
+/* ---------------- Artifacts view ---------------- */
+function spark(series){
+  if(!series||!series.values||series.values.length<2)return null;
+  const v=series.values,W=300,H=56,pad=6,mn=Math.min(...v),mx=Math.max(...v),rg=(mx-mn)||1;
+  const x=i=>pad+i*(W-2*pad)/(v.length-1), y=n=>H-16-(n-mn)/rg*(H-26);
+  const pts=v.map((n,i)=>`${x(i).toFixed(1)},${y(n).toFixed(1)}`).join(" ");
+  const ns="http://www.w3.org/2000/svg", s=document.createElementNS(ns,"svg");
+  s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("class","spark");s.setAttribute("role","img");s.setAttribute("aria-label",(series.name||"Trend")+": "+v.join(", "));
+  s.innerHTML=`<line x1="${pad}" x2="${W-pad}" y1="${H-16}" y2="${H-16}" stroke="var(--line)"/>`+
+    `<polygon points="${x(0)},${H-16} ${pts} ${x(v.length-1)},${H-16}" fill="var(--soft)"/>`+
+    `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`+
+    `<circle cx="${x(v.length-1)}" cy="${y(v[v.length-1])}" r="3.5" fill="var(--accent)"/>`;
+  (series.labels||[]).forEach((l,i)=>{const t=document.createElementNS(ns,"text");t.setAttribute("x",x(i));t.setAttribute("y",H-2);t.setAttribute("font-size","10");t.setAttribute("fill","var(--muted)");t.setAttribute("font-family","var(--f-mono)");t.setAttribute("text-anchor",i===0?"start":i===v.length-1?"end":"middle");t.textContent=l;s.append(t)});
+  return s;
+}
+function renderArtifacts(){
+  const g=$("#agrid"); g.replaceChildren();
+  const on=ARTS.filter(a=>S.settings.cards[a.key]!==false);
+  if(!on.length){g.append(el("div",{class:"empty",style:"grid-column:1/-1"},"All dashboard cards are switched off. Turn them back on under ",el("a",{href:"#admin"},"Admin"),"."));return}
+  for(const a of on){
+    const k=S.kpis[a.key]||{};
+    const card=el("article",{class:"acard"+(a.wide?" wide":"")},
+      el("header",{},el("div",{},el("h3",{text:k.title||a.title}),el("div",{class:"per",text:k.period||(S.kpisLoaded?"No snapshot yet":"Loading…")})),
+        el("a",{class:"btn sm open",href:a.url,target:"_blank",rel:"noopener"},"Open ↗")));
+    const kp=(k.kpis||[]);
+    if(kp.length){
+      card.append(el("div",{class:"kpis"},kp.map(x=>{
+        const cls=x.dir?(x.dir+"-"+(x.good===false?"bad":x.good===true?"good":"")).replace(/-$/," flat"):"flat";
+        return el("div",{class:"kpi"},el("div",{class:"l",text:x.label}),el("div",{class:"v",text:x.value}),x.delta?el("div",{class:"d "+(x.good==null?"flat":cls),text:(x.dir==="up"?"▲ ":x.dir==="down"?"▼ ":"")+x.delta}):null)
+      })));
+    }
+    const sp=spark(k.series); if(sp) card.append(el("div",{},el("div",{class:"eyebrow",text:k.series.name||"Trend"}),sp));
+    if(k.drivers&&k.drivers.length){
+      const mx=Math.max(...k.drivers.map(d=>d.n));
+      card.append(el("div",{class:"drivers"},el("div",{class:"eyebrow",text:k.driversTitle||"Top drivers"}),
+        k.drivers.map(d=>el("div",{class:"drv"},el("span",{text:d.label}),el("span",{class:"mono",text:d.display||d.n}),el("div",{class:"bar"},el("i",{style:`width:${Math.round(100*d.n/mx)}%`}))))));
+    }
+    if(!kp.length&&!(k.drivers||[]).length) card.append(el("div",{class:"empty",text:k.note||"Numbers for this card load inside the full dashboard. Open it to see the live view."}));
+    else if(k.note) card.append(el("div",{class:"note",text:k.note}));
+    card.append(el("div",{class:"foot"},el("span",{text:k.source?("Source: "+k.source):""}),k.asOf?el("span",{class:"mono",text:"· as of "+fmtDate(k.asOf)}):null));
+    g.append(card);
+  }
+}
+function counts(){
+  const all=Object.values(S.items).flat().filter(i=>!S.ui.done[keyOf(i)]);
+  const open=(S.tasks||[]).filter(t=>!t.done);
+  return {inn:all.filter(i=>i.dir==="in").length,out:all.filter(i=>i.dir==="out").length,overdue:all.filter(i=>i.overdue).length,tasks:open.length,today:open.filter(t=>t.due&&t.due<=todayISO()).length};
+}
+function renderGlance(){
+  const c=counts(),g=$("#glance");
+  const tile=(n,l,go)=>el("button",{class:"gl",type:"button",onclick:go},el("b",{class:"mono",text:String(n)}),el("span",{text:l}));
+  g.replaceChildren(
+    tile(c.inn,"waiting on you",()=>{S.dir="in";location.hash="#inbox";renderInbox()}),
+    tile(c.out,"waiting on others",()=>{S.dir="out";location.hash="#inbox";renderInbox()}),
+    tile(c.overdue,"overdue in Linear",()=>{S.dir="all";location.hash="#inbox";renderInbox()}),
+    tile(c.today,`personal tasks due (${c.tasks} open)`,()=>{location.hash="#mytasks"})
+  );
+}
+
+/* ---------------- Inbox view ---------------- */
+function visible(src){
+  const q=S.q.toLowerCase();
+  return (S.items[src]||[]).filter(i=>(S.dir==="all"||i.dir===S.dir)&&(S.settings.showDone||!S.ui.done[keyOf(i)])&&(!q||(i.title+" "+i.body+" "+i.person+" "+i.where).toLowerCase().includes(q)));
+}
+function itemRow(it){
+  const k=keyOf(it), done=!!S.ui.done[k], rem=S.ui.reminded[k], openMode=S.open[k];
+  const meta=[el("span",{class:"pill "+it.dir,text:it.dir==="in"?"For me":"Waiting on "+(it.person||"them").split(",")[0]})];
+  if(it.dir==="in"&&it.person) meta.push(el("span",{text:"from "+it.person}));
+  meta.push(el("span",{text:it.where}));
+  if(it.status) meta.push(el("span",{class:"pill",text:it.status}));
+  if(it.priority&&it.priority!=="No priority") meta.push(el("span",{class:"pill"+(/Urgent|High/.test(it.priority)?" warn":""),text:it.priority}));
+  if(it.due) meta.push(el("span",{class:"pill"+(it.overdue?" bad":""),text:(it.overdue?"Overdue · ":"Due ")+fmtDate(it.due)}));
+  if(it.unread) meta.push(el("span",{class:"pill in",text:"Unread"}));
+  if(it.replies) meta.push(el("span",{text:it.replies+" replies"}));
+  if(it.time) meta.push(el("span",{class:"mono",text:ago(it.time)}));
+  if(rem) meta.push(el("span",{class:"pill good",text:"Reminded "+ago(rem)}));
+  const canReply=["slack","linear","gmail"].includes(it.src);
+  const acts=el("div",{class:"acts"},
+    canReply?el("button",{class:"btn sm",type:"button",onclick:()=>{S.open[k]=openMode==="reply"?null:"reply";renderInbox()}},"Reply"):null,
+    it.src==="slack"?el("button",{class:"btn sm",type:"button",onclick:()=>{S.open[k]=openMode==="react"?null:"react";renderInbox()}},"React"):null,
+    it.src==="gmail"?el("button",{class:"btn sm",type:"button",onclick:()=>star(it)},"★ Star"):null,
+    it.dir==="out"&&canReply?el("button",{class:"btn sm",type:"button",onclick:()=>openRemind([it])},"Remind"):null,
+    el("button",{class:"btn sm ghost",type:"button",onclick:()=>markDone(it,!done)},done?"Undo":"Done"),
+    el("button",{class:"btn sm ghost",type:"button",onclick:()=>toTask(it)},"+ Task"),
+    it.url?el("a",{class:"btn sm ghost",href:it.url,target:"_blank",rel:"noopener"},"Open ↗"):null);
+  const body=el("div",{style:"min-width:0"},el("div",{class:"it-t",text:it.title}),
+    it.body&&it.body!==it.title?el("div",{class:"it-x",text:it.body}):null,el("div",{class:"it-m"},meta),acts);
+  if(openMode==="reply") body.append(composer(it));
+  if(openMode==="react") body.append(el("div",{class:"emo"},EMOJI.map(([n,g])=>el("button",{type:"button",title:":"+n+":",onclick:()=>react(it,n)},g))));
+  const cb=el("input",{type:"checkbox","aria-label":"Select",onchange:e=>{e.target.checked?S.sel.add(k):S.sel.delete(k);renderBulk()}}); cb.checked=S.sel.has(k);
+  return el("div",{class:"item"+(done?" done":"")},cb,body);
+}
+function composer(it){
+  const ta=el("textarea",{id:"reply-"+keyOf(it).replace(/[^\w-]/g,"_"),placeholder:it.dir==="out"?"Write a follow-up…":"Write a reply…"});
+  const st=el("span",{class:"note"});
+  const send=el("button",{class:"btn sm primary",type:"button",onclick:async()=>{
+    const v=ta.value.trim(); if(!v){st.textContent="Write something first.";return}
+    send.disabled=true;st.textContent="Sending…";
+    try{await sendReply(it,v);st.textContent="Sent.";st.className="note okmsg";toast(`Reply sent on ${SOURCES.find(s=>s.key===it.src).name}`);S.open[keyOf(it)]=null;
+      if(S.cap.mcp)S.cap.mcp.invalidate(SOURCES.find(s=>s.key===it.src).server).catch(()=>{});setTimeout(renderInbox,900)}
+    catch(e){st.textContent=errText(e,it.src);send.disabled=false}
+  }},"Send");
+  const draft=S.cap.sample?el("button",{class:"btn sm",type:"button",onclick:async()=>{
+    draft.disabled=true;st.textContent="Drafting…";
+    try{
+      const prompt=`You draft short workplace replies for Sajid Magadi (Senior Manager, Quality & Training, Operations at Transak). Write ONLY the reply text, no preamble, 1-3 sentences, friendly and direct, no emojis unless the source uses them.\nChannel: ${it.src}\nDirection: ${it.dir==="in"?"Someone asked Sajid; he is responding":"Sajid assigned this to "+it.person+"; write a polite follow-up"}\nFrom/To: ${it.person}\nContext: ${it.where}\nTitle: ${it.title}\nContent: ${(it.body||"").slice(0,1500)}`;
+      const r=await S.cap.sample(prompt,{modelTier:"quick",cache:false,onText:u=>{ta.value=u.text}});
+      ta.value=r.text.trim();st.textContent="Draft ready. Edit before sending.";
+    }catch(e){st.textContent=e&&e.code==="rate_limited"?"Drafting is busy. Try again shortly.":"Couldn't draft this one."}
+    draft.disabled=false;
+  }},"Draft with Claude"):null;
+  if(it.dir==="out") ta.value=fillTemplate(it);
+  return el("div",{class:"composer"},ta,el("div",{class:"row"},send,draft,el("button",{class:"btn sm ghost",type:"button",onclick:()=>{S.open[keyOf(it)]=null;renderInbox()}},"Cancel"),st));
+}
+async function react(it,name){
+  try{await call("Slack","slack_add_reaction",{channel_id:it.channelId,message_ts:it.ts,emoji:name},{read:false});toast(`Reacted :${name}:`);S.open[keyOf(it)]=null;renderInbox()}
+  catch(e){toast(errText(e,"Slack"))}
+}
+async function star(it){
+  try{await call("Gmail","label_thread",{threadId:it.id,labelIds:["STARRED"]},{read:false});toast("Starred in Gmail")}catch(e){toast(errText(e,"Gmail"))}
+}
+function renderInbox(){
+  const g=$("#cgrid"); if(!g)return; g.replaceChildren();
+  document.querySelectorAll(".seg [data-dir]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.dir===S.dir)));
+  $("#inboxSub").textContent=`Everything assigned to you, and everything you've assigned to others, since ${fmtDate(S.settings.since)}.`;
+  for(const s of SOURCES){
+    if(!S.settings.sources[s.key]) continue;
+    const head=el("header",{},el("div",{class:"logo",style:`background:${s.color}`,text:s.mark}),el("div",{},el("h3",{text:s.name})));
+    const card=el("section",{class:"ccard","aria-label":s.name},head);
+    if(s.key==="bamboo"){
+      head.lastChild.append(el("div",{class:"cnt",text:"Not connected"}));
+      card.append(el("div",{class:"err",style:"color:var(--muted)"},"BambooHR isn't connected to your Claude account yet, so Fiza can't read approvals or onboarding tasks from it. Ask your admin to add a BambooHR connector in claude.ai Settings → Connectors and Fiza will light this card up. You can hide this card under Admin."));
+      g.append(card);continue;
+    }
+    const st=S.status[s.key], items=visible(s.key), all=S.items[s.key]||[];
+    const ni=all.filter(i=>i.dir==="in"&&!S.ui.done[keyOf(i)]).length, no=all.filter(i=>i.dir==="out"&&!S.ui.done[keyOf(i)]).length;
+    head.lastChild.append(el("div",{class:"cnt mono",text:st==="ok"||all.length?`${ni} for you · ${no} waiting on others`:st==="loading"?"Loading…":""}));
+    const selAll=el("button",{class:"btn sm ghost",type:"button",onclick:()=>{const ks=items.map(keyOf);const allSel=ks.every(k=>S.sel.has(k));ks.forEach(k=>allSel?S.sel.delete(k):S.sel.add(k));renderInbox();renderBulk()}},"Select all");
+    head.append(el("div",{class:"r"},el("span",{class:"state",text:S.at[s.key]?ago(S.at[s.key]):""}),items.length?selAll:null,
+      el("button",{class:"btn sm",type:"button",onclick:()=>load(s.key,true),disabled:st==="loading"},st==="error"&&S.err[s.key]&&S.err[s.key].code==="approval_required"?"Load":"Refresh")));
+    if(st==="error") card.append(el("div",{class:"err",text:S.err[s.key].code==="setup"?S.err[s.key].message:errText(S.err[s.key],s.name)}));
+    const list=el("div",{class:"list"});
+    if(items.length) items.forEach(i=>list.append(itemRow(i)));
+    else if(st==="loading") list.append(el("div",{class:"empty",style:"margin:14px",text:`Loading ${s.name}…`}));
+    else if(st==="ok") list.append(el("div",{class:"empty",style:"margin:14px",text:S.q?"Nothing matches your search.":S.dir==="out"?"Nobody is waiting on a reply from this source.":"You're clear here."}));
+    else if(!S.cap.mcp&&st!=="error") list.append(el("div",{class:"empty",style:"margin:14px",text:"Live items load when you open Fiza on claude.ai."}));
+    card.append(list); g.append(card);
+  }
+  if(!g.children.length) g.append(el("div",{class:"empty",style:"grid-column:1/-1"},"Every connector is switched off. Turn them on under ",el("a",{href:"#admin"},"Admin"),"."));
+}
+function selectedItems(){const all=Object.values(S.items).flat();return all.filter(i=>S.sel.has(keyOf(i)))}
+function renderBulk(){
+  const b=$("#bulk"),its=selectedItems(); if(!its.length){b.hidden=true;return}
+  const out=its.filter(i=>i.dir==="out"&&["slack","linear","gmail"].includes(i.src));
+  b.replaceChildren(el("span",{text:`${its.length} selected`}),
+    out.length?el("button",{class:"btn sm primary",type:"button",onclick:()=>openRemind(out)},`Remind ${out.length}`):null,
+    el("button",{class:"btn sm",type:"button",onclick:()=>{its.forEach(i=>S.ui.done[keyOf(i)]=Date.now());S.sel.clear();saveUIsoon();renderInbox();renderBulk();renderGlance()}},"Mark done"),
+    el("button",{class:"btn sm",type:"button",onclick:async()=>{for(const i of its)await toTask(i,true);S.sel.clear();renderInbox();renderBulk();toast(`Added ${its.length} to My tasks`)}},"Add to My tasks"),
+    el("button",{class:"btn sm",type:"button",onclick:()=>{S.sel.clear();renderInbox();renderBulk()}},"Clear"));
+  b.hidden=false;
+}
+
+/* ---------------- Reminder modal ---------------- */
+function openRemind(list){
+  list=list.filter(i=>["slack","linear","gmail"].includes(i.src));
+  if(!list.length){toast("Nothing to remind. Reminders go to items waiting on others in Slack, Linear or Gmail.");return}
+  const host=$("#modalHost");
+  const ta=el("textarea",{class:"inp",id:"remTpl",style:"min-height:80px"}); ta.value=S.settings.template;
+  const prev=el("div",{class:"note"});
+  const upd=()=>{prev.textContent="Preview: "+fillTemplate(list[0],ta.value)}; ta.addEventListener("input",upd); upd();
+  const rl=el("div",{class:"rlist"},list.map(i=>el("div",{"data-k":keyOf(i)},el("span",{class:"pill",text:SOURCES.find(s=>s.key===i.src).name}),el("span",{style:"flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap",text:`${i.person} — ${i.title}`}),el("span",{class:"st note",text:S.ui.reminded[keyOf(i)]?"last "+ago(S.ui.reminded[keyOf(i)]):""}))));
+  const go=el("button",{class:"btn primary",type:"button"},`Send ${list.length} reminder${list.length>1?"s":""}`);
+  const close=()=>host.replaceChildren();
+  const res=el("div",{class:"note"});
+  go.onclick=async()=>{
+    go.disabled=true; let ok=0,bad=0;
+    for(const i of list){
+      const row=rl.querySelector(`[data-k="${CSS.escape(keyOf(i))}"] .st`);
+      row.textContent="Sending…";
+      try{await sendReply(i,fillTemplate(i,ta.value));S.ui.reminded[keyOf(i)]=Date.now();row.textContent="Sent";row.className="st note okmsg";ok++}
+      catch(e){row.textContent=errText(e,i.src);row.style.color="var(--bad)";bad++}
+    }
+    res.textContent=`${ok} sent${bad?`, ${bad} failed`:""}.`; saveUIsoon(); S.sel.clear(); renderBulk(); renderInbox();
+    go.replaceWith(el("button",{class:"btn",type:"button",onclick:close},"Close"));
+  };
+  host.replaceChildren(el("div",{class:"scrim",onclick:e=>{if(e.target===e.currentTarget)close()}},
+    el("div",{class:"modal",role:"dialog","aria-modal":"true","aria-label":"Send reminders"},
+      el("h3",{text:"Send reminders"}),
+      el("p",{class:"note",style:"margin:0"},"Each reminder goes back into its original thread: a Slack thread reply, a Linear comment, or an email reply-all. Use {name}, {title} and {due} in the message."),
+      el("label",{class:"eyebrow",for:"remTpl"},"Message"),ta,prev,rl,
+      el("div",{style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap"},go,el("button",{class:"btn ghost",type:"button",onclick:close},"Cancel"),res))));
+}
+
+/* ---------------- Tasks ---------------- */
+async function toTask(it,quiet){
+  if(!tasksCol){toast("Personal tasks need you to be signed in on claude.ai.");return}
+  await tasksCol.add({title:it.title.slice(0,200),due:it.due||"",pri:it.priority&&/Urgent|High/.test(it.priority)?2:3,done:false,createdAt:Date.now(),link:it.url||"",from:SOURCES.find(s=>s.key===it.src).name+(it.person?" · "+it.person:"")});
+  if(!quiet) toast("Added to My tasks");
+}
+function postAt(due){
+  const [hh,mm]=(S.settings.reminderTime||"09:30").split(":").map(Number);
+  let t=due?new Date(due+"T00:00:00"):new Date(); t.setHours(hh,mm,0,0);
+  const min=Date.now()+3*60e3; if(t.getTime()<min) t=new Date(min);
+  return Math.floor(t.getTime()/1000);
+}
+async function scheduleTask(t,quiet){
+  const me=S.settings.slackUserId; if(!me){toast("Add your Slack member ID under Admin first.");return false}
+  const pa=postAt(t.due);
+  try{
+    await call("Slack","slack_schedule_message",{channel_id:me,post_at:pa,message:`⏰ *Reminder from Fiza:* ${t.title}${t.due?` (due ${fmtDate(t.due)})`:""}${t.link?`\n${t.link}`:""}`},{read:false});
+    await tasksCol.doc(t.id).update({remindAt:pa*1000});
+    if(!quiet) toast("Slack reminder scheduled for "+new Date(pa*1000).toLocaleString(undefined,{weekday:"short",hour:"2-digit",minute:"2-digit"}));
+    return true;
+  }catch(e){if(!quiet)toast(errText(e,"Slack"));return false}
+}
+function renderTasks(){
+  const box=$("#tasks"); if(!box)return;
+  if(S.tasks==null){box.replaceChildren(el("div",{class:"empty",text:S.uid===null&&S.cap.db===null?"Sign in on claude.ai to keep personal tasks.":"Loading your tasks…"}));return}
+  const td=todayISO(), wk=addDays(td,7), groups={Overdue:[],Today:[],"Next 7 days":[],Later:[],"No date":[],Done:[]};
+  for(const t of S.tasks){
+    if(t.done)groups.Done.push(t);else if(!t.due)groups["No date"].push(t);else if(t.due<td)groups.Overdue.push(t);else if(t.due===td)groups.Today.push(t);else if(t.due<=wk)groups["Next 7 days"].push(t);else groups.Later.push(t);
+  }
+  box.replaceChildren();
+  if(!S.tasks.length){box.append(el("div",{class:"empty"},"No tasks yet. Add one above, or use + Task on anything in your ",el("a",{href:"#inbox"},"Work inbox"),"."));return}
+  for(const [name,list] of Object.entries(groups)){
+    if(!list.length)continue;
+    list.sort((a,b)=>(a.due||"9").localeCompare(b.due||"9")||(a.pri||3)-(b.pri||3));
+    box.append(el("div",{class:"tsec"},el("h4",{text:`${name} · ${list.length}`}),list.map(t=>{
+      const cb=el("input",{type:"checkbox","aria-label":"Done",onchange:e=>tasksCol.doc(t.id).update({done:e.target.checked,doneAt:e.target.checked?Date.now():null})}); cb.checked=!!t.done;
+      return el("div",{class:"trow"+(t.done?" done":"")},cb,
+        el("div",{style:"min-width:0"},el("div",{class:"tt",text:t.title}),
+          el("div",{class:"it-m"},t.due?el("span",{class:"pill"+(!t.done&&t.due<td?" bad":""),text:"Due "+fmtDate(t.due)}):null,
+            el("span",{class:"pill"+(t.pri===2?" warn":""),text:{2:"High",3:"Medium",4:"Low"}[t.pri||3]}),
+            t.from?el("span",{text:t.from}):null,
+            t.remindAt?el("span",{class:"pill good",text:"Slack reminder "+new Date(t.remindAt).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}):null,
+            t.link?el("a",{href:t.link,target:"_blank",rel:"noopener"},"Open ↗"):null)),
+        el("div",{class:"acts",style:"margin:0"},
+          !t.done?el("button",{class:"btn sm",type:"button",onclick:()=>scheduleTask(t)},"Remind me"):null,
+          el("button",{class:"btn sm ghost",type:"button",onclick:()=>tasksCol.doc(t.id).delete()},"Delete")));
+    })));
+  }
+}
+$("#addTask").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!tasksCol){toast("Sign in on claude.ai to keep personal tasks.");return}
+  const title=$("#tTitle").value.trim(); if(!title)return;
+  await tasksCol.add({title,due:$("#tDue").value||"",pri:+$("#tPri").value,done:false,createdAt:Date.now()});
+  $("#tTitle").value="";$("#tDue").value="";
+});
+$("#schedAll").addEventListener("click",async e=>{
+  const open=(S.tasks||[]).filter(t=>!t.done&&!t.remindAt); if(!open.length){toast("Every open task already has a reminder.");return}
+  e.target.disabled=true;$("#taskNote").textContent=`Scheduling ${open.length}…`;let ok=0;
+  for(const t of open) if(await scheduleTask(t,true)) ok++;
+  $("#taskNote").textContent=`${ok} of ${open.length} reminders scheduled on Slack.`;e.target.disabled=false;
+});
+$("#digestNow").addEventListener("click",async e=>{
+  const me=S.settings.slackUserId; if(!me){toast("Add your Slack member ID under Admin first.");return}
+  const open=(S.tasks||[]).filter(t=>!t.done), c=counts(), td=todayISO();
+  const lines=open.sort((a,b)=>(a.due||"9").localeCompare(b.due||"9")).slice(0,25).map(t=>`• ${t.due&&t.due<td?"*Overdue* ":""}${t.title}${t.due?` (due ${fmtDate(t.due)})`:""}`);
+  const msg=`*Fiza digest · ${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"short"})}*\n${c.inn} items waiting on you · ${c.out} waiting on others · ${c.overdue} overdue in Linear\n\n*Personal tasks (${open.length} open)*\n${lines.join("\n")||"Nothing open."}`;
+  e.target.disabled=true;
+  try{await call("Slack","slack_send_message",{channel_id:me,message:msg},{read:false});toast("Digest sent to your Slack DMs")}catch(err){toast(errText(err,"Slack"))}
+  e.target.disabled=false;
+});
+
+/* ---------------- Admin ---------------- */
+const saveSettings=debounce(async()=>{if(!settingsRef)return;try{await settingsRef.set(S.settings)}catch(e){toast("Couldn't save settings. Check your connection.")}},500);
+function setS(path,val){
+  const parts=path.split("."); let o=S.settings; while(parts.length>1)o=o[parts.shift()]; o[parts[0]]=val;
+  saveSettings(); applyTheme(); renderAll();
+}
+function tog(id,label,note,path){
+  const v=path.split(".").reduce((o,k)=>o&&o[k],S.settings);
+  const cb=el("input",{type:"checkbox",class:"sw",id,onchange:e=>{setS(path,e.target.checked);if(path.startsWith("sources.")||["slackMentions","slackDMs","gmailImportant","linearDone"].includes(path)){const src=path.split(".")[1];if(FETCH[src])load(src);else if(path.startsWith("slack"))load("slack");else if(path.startsWith("gmail"))load("gmail");else if(path.startsWith("linear"))load("linear")}}}); cb.checked=v!==false;
+  return el("div",{class:"tog"},el("label",{for:id},el("b",{text:label}),note?el("span",{class:"note",text:note}):null),cb);
+}
+function renderAdmin(){
+  const g=$("#adminGrid"); g.replaceChildren();
+  const pl=el("div",{class:"planets"},Object.entries(PLANETS).map(([k,p])=>{const o=el("div",{class:"orb"});orbStyle(o,k);
+    return el("button",{class:"planet",type:"button","aria-pressed":String(S.settings.theme===k),onclick:()=>{setS("theme",k);renderAdmin()}},o,el("div",{},el("b",{text:p.name}),el("span",{text:p.tag})))}));
+  const mode=el("div",{class:"seg",role:"group","aria-label":"Light or dark"},["system","light","dark"].map(m=>el("button",{type:"button","aria-pressed":String(S.settings.mode===m),onclick:()=>{setS("mode",m);renderAdmin()}},m[0].toUpperCase()+m.slice(1))));
+  g.append(el("section",{class:"panel"},el("h3",{text:"Appearance"}),el("p",{class:"note",text:"Pick a planet. Each one has its own light and dark palette."}),pl,el("div",{class:"tog",style:"border-top:0;margin-top:8px"},el("b",{text:"Light or dark"}),mode)));
+
+  g.append(el("section",{class:"panel"},el("h3",{text:"Artifact cards"}),el("p",{class:"note",text:"Choose which dashboards show on the Artifacts tab."}),
+    ARTS.map(a=>tog("card-"+a.key,a.title,(S.kpis[a.key]&&S.kpis[a.key].source)||"",`cards.${a.key}`))));
+
+  const sid=el("input",{class:"inp",id:"slackId",value:S.settings.slackUserId||"",placeholder:"e.g. U01ABCDE23",onchange:e=>{setS("slackUserId",e.target.value.trim());load("slack")}});
+  const mail=el("input",{class:"inp",id:"myEmail",value:S.settings.myEmail||"",placeholder:"you@transak.com",onchange:e=>{setS("myEmail",e.target.value.trim());load("gmail")}});
+  g.append(el("section",{class:"panel"},el("h3",{text:"Connectors"}),el("p",{class:"note",text:"Switch a source off to hide its card and stop loading it."}),
+    tog("src-slack","Slack","Mentions, DMs and your requests to others","sources.slack"),
+    tog("opt-sm","Slack · channel mentions","Messages that @mention you","slackMentions"),
+    tog("opt-sd","Slack · direct messages","DMs sent to you","slackDMs"),
+    tog("src-linear","Linear","Issues assigned to you, and issues you created for others","sources.linear"),
+    tog("opt-ld","Linear · include completed","Show Done and Cancelled issues too","linearDone"),
+    tog("src-gmail","Gmail","Inbox threads, and sent threads awaiting a reply","sources.gmail"),
+    tog("opt-gi","Gmail · important only","Only threads Gmail marks important","gmailImportant"),
+    tog("src-rp","Revolut People","Q4 goals, time-off approvals and meeting action items","sources.rp"),
+    tog("src-bb","BambooHR","Shows a setup card until a BambooHR connector exists","sources.bamboo"),
+    el("div",{class:"field"},el("label",{class:"eyebrow",for:"slackId"},"Your Slack member ID"),sid,el("span",{class:"note",text:"Used to find your mentions and to DM you reminders."})),
+    el("div",{class:"field"},el("label",{class:"eyebrow",for:"myEmail"},"Your email"),mail)));
+
+  const tpl=el("textarea",{class:"inp",id:"tpl",onchange:e=>setS("template",e.target.value)}); tpl.value=S.settings.template;
+  const since=el("input",{class:"inp",type:"date",id:"sinceAdm",value:S.settings.since,onchange:e=>{setS("since",e.target.value||DEFAULTS.since);loadAll()}});
+  const rt=el("input",{class:"inp",type:"time",id:"remTime",value:S.settings.reminderTime,onchange:e=>setS("reminderTime",e.target.value||"09:30")});
+  const rf=el("select",{class:"inp",id:"refMin",onchange:e=>{setS("refreshMin",+e.target.value);schedule()}},[0,15,30,60].map(n=>{const o=el("option",{value:n},n?`Every ${n} min`:"Manual only");if(n===S.settings.refreshMin)o.selected=true;return o}));
+  const perm=el("button",{class:"btn",type:"button",onclick:async()=>{try{const p=await use("permissions");if(!p)throw 0;await p.manage()}catch{toast("Open this artifact's Permissions menu on claude.ai to change connector access.")}}},"Manage connector access");
+  g.append(el("section",{class:"panel"},el("h3",{text:"Inbox and reminders"}),
+    el("div",{class:"field"},el("label",{class:"eyebrow",for:"sinceAdm"},"Show work since"),since),
+    el("div",{class:"field"},el("label",{class:"eyebrow",for:"tpl"},"Reminder message"),tpl,el("span",{class:"note",text:"{name} = first name, {title} = task title, {due} = due date if any."})),
+    el("div",{class:"field"},el("label",{class:"eyebrow",for:"remTime"},"Personal reminder time"),rt),
+    el("div",{class:"field"},el("label",{class:"eyebrow",for:"refMin"},"Auto-refresh"),rf),
+    tog("opt-done","Show items I've marked done","","showDone"),
+    el("div",{class:"tog"},el("div",{},el("b",{text:"Connector access"}),el("span",{class:"note",text:"Allow or revoke Slack, Linear, Gmail and Revolut People for this page."})),perm),
+    el("div",{class:"tog"},el("div",{},el("b",{text:"Reset"}),el("span",{class:"note",text:"Restore default settings. Your tasks stay."})),el("button",{class:"btn",type:"button",onclick:()=>{const keep={slackUserId:S.settings.slackUserId,myEmail:S.settings.myEmail};S.settings=Object.assign(structuredClone(DEFAULTS),keep);saveSettings();applyTheme();renderAll();loadAll()}},"Reset settings"))));
+}
+function renderAll(){renderArtifacts();renderGlance();renderInbox();renderTasks();renderAdmin();$("#since").value=S.settings.since}
+
+/* ---------------- wiring ---------------- */
+document.querySelectorAll(".seg [data-dir]").forEach(b=>b.addEventListener("click",()=>{S.dir=b.dataset.dir;renderInbox()}));
+$("#q").addEventListener("input",debounce(e=>{S.q=e.target.value;renderInbox()},200));
+$("#since").addEventListener("change",e=>{setS("since",e.target.value||DEFAULTS.since);loadAll()});
+$("#refreshAll").addEventListener("click",()=>loadAll(true));
+$("#remindAll").addEventListener("click",()=>openRemind(Object.values(S.items).flat().filter(i=>i.dir==="out"&&!S.ui.done[keyOf(i)])));
+let timer=null; function schedule(){clearInterval(timer);if(S.settings.refreshMin>0)timer=setInterval(()=>{if(!document.hidden)loadAll(true)},S.settings.refreshMin*60e3)}
+renderAll();
+
+/* ---------------- boot ---------------- */
+(async()=>{
+  const [user,db,mcp,sample]=await Promise.all(["user","db","mcp","sample"].map(n=>use(n)));
+  S.cap={user,db,mcp,sample};
+  renderAll(); updateSync();
+  if(db){
+    const tmo=setTimeout(()=>{if(!S.kpisLoaded){S.kpisLoaded=true;renderArtifacts()}},10000);
+    db.collection("kpis").onSnapshot(snap=>{clearTimeout(tmo);S.kpis={};snap.docs.forEach(d=>S.kpis[d.id]=d.data());S.kpisLoaded=true;renderArtifacts();renderAdmin()},()=>{S.kpisLoaded=true;renderArtifacts()});
+    const uid=user?await user.id():null; S.uid=uid;
+    if(uid){
+      settingsRef=db.doc(`data/users/${uid}/settings`); stateRef=db.doc(`data/users/${uid}/state`); tasksCol=db.collection(`data/users/${uid}/fiza/tasks`);
+      let first=true;
+      settingsRef.onSnapshot(snap=>{
+        const d=snap.exists?snap.data():{};
+        const merged=Object.assign(structuredClone(DEFAULTS),d); merged.cards=Object.assign({},DEFAULTS.cards,d.cards); merged.sources=Object.assign({},DEFAULTS.sources,d.sources);
+        const before=JSON.stringify(S.settings); S.settings=merged; applyTheme();
+        if(first||before!==JSON.stringify(merged)){renderAll()}
+        if(first){first=false;
+          if(!S.settings.myEmail&&user){user.me().then(m=>{if(m&&m.email&&!S.settings.myEmail){S.settings.myEmail=m.email;saveSettings()}}).catch(()=>{})}
+          if(mcp) loadAll(); schedule();
+        }
+      },()=>{if(first){first=false;if(mcp)loadAll()}});
+      stateRef.onSnapshot(s=>{const d=s.exists?s.data():{};S.ui.done=d.done||{};S.ui.reminded=d.reminded||{};renderInbox();renderGlance()});
+      tasksCol.onSnapshot(s=>{S.tasks=s.docs.map(d=>({id:d.id,...d.data()}));renderTasks();renderGlance()},()=>{S.tasks=[];renderTasks()});
+      return;
+    }
+  }
+  S.tasks=null; renderTasks();
+  if(mcp) loadAll();
+})();
+setInterval(updateSync,60e3);
+})();
+</script>
